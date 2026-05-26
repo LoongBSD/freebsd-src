@@ -63,6 +63,8 @@
 
 #include "pcib_if.h"
 
+int generic_pcie_get_id(device_t, device_t, enum pci_id_type, uintptr_t *);
+
 #define	SPACE_CODE_SHIFT	24
 #define	SPACE_CODE_MASK		0x3
 #define	SPACE_CODE_IO_SPACE	0x1
@@ -261,7 +263,7 @@ generic_pcie_fdt_route_interrupt(device_t bus, device_t dev, int pin)
 	    (pci_get_slot(dev) << OFW_PCI_PHYS_HI_DEVICESHIFT) |
 	    (pci_get_function(dev) << OFW_PCI_PHYS_HI_FUNCTIONSHIFT);
 
-	intrcells = ofw_bus_lookup_imap(ofw_bus_get_node(dev),
+	intrcells = ofw_bus_lookup_imap(ofw_bus_get_node(bus),
 	    &sc->pci_iinfo, &reg, sizeof(reg), &pintr, sizeof(pintr),
 	    mintr, sizeof(mintr), &iparent);
 	if (intrcells) {
@@ -269,8 +271,6 @@ generic_pcie_fdt_route_interrupt(device_t bus, device_t dev, int pin)
 		return (pintr);
 	}
 
-	device_printf(bus, "could not route pin %d for device %d.%d\n",
-	    pin, pci_get_slot(dev), pci_get_function(dev));
 	return (PCI_INVALID_IRQ);
 }
 
@@ -402,6 +402,9 @@ generic_pcie_get_id(device_t pci, device_t child, enum pci_id_type type,
 		return (pcib_get_id(pci, child, type, id));
 
 	node = ofw_bus_get_node(pci);
+	if (node == 0 || node == -1)
+		return (ENXIO);
+
 	pci_rid = pci_get_rid(child);
 
 	err = ofw_bus_msimap(node, pci_rid, NULL, &rid);

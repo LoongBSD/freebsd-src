@@ -1,5 +1,7 @@
 /*-
  * Copyright (c) 2015-2017 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -36,6 +38,6 @@
 	.text
 	.align	2
 
-ENTRY(riscv_nullop)
-	ret
-END(riscv_nullop)
+ENTRY(loongarch_nullop)
+	jr	$ra
+END(loongarch_nullop)

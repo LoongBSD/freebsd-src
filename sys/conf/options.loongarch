@@ -1,0 +1,6 @@
+
+LoongArch			opt_global.h	# For cpu LoongArch to work
+INTRNG				opt_global.h
+
+# ACPI support
+ACPI				opt_global.h

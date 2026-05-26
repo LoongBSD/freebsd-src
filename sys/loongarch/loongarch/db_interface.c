@@ -1,5 +1,8 @@
 /*-
  * Copyright (c) 2015 The FreeBSD Foundation
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
+ * All rights reserved.
  *
  * This software was developed by Semihalf under
  * the sponsorship of the FreeBSD Foundation.
@@ -26,6 +29,7 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <vm/vm.h>
@@ -63,28 +67,8 @@ db_frame(struct db_variable *vp, db_expr_t *valuep, int op)
 #define DB_OFFSET(x)	(db_expr_t *)offsetof(struct trapframe, x)
 struct db_variable db_regs[] = {
 	{ "ra",		DB_OFFSET(tf_ra),	db_frame },
-	{ "sp",		DB_OFFSET(tf_sp),	db_frame },
-	{ "gp",		DB_OFFSET(tf_gp),	db_frame },
 	{ "tp",		DB_OFFSET(tf_tp),	db_frame },
-	{ "t0",		DB_OFFSET(tf_t[0]),	db_frame },
-	{ "t1",		DB_OFFSET(tf_t[1]),	db_frame },
-	{ "t2",		DB_OFFSET(tf_t[2]),	db_frame },
-	{ "t3",		DB_OFFSET(tf_t[3]),	db_frame },
-	{ "t4",		DB_OFFSET(tf_t[4]),	db_frame },
-	{ "t5",		DB_OFFSET(tf_t[5]),	db_frame },
-	{ "t6",		DB_OFFSET(tf_t[6]),	db_frame },
-	{ "s0",		DB_OFFSET(tf_s[0]),	db_frame },
-	{ "s1",		DB_OFFSET(tf_s[1]),	db_frame },
-	{ "s2",		DB_OFFSET(tf_s[2]),	db_frame },
-	{ "s3",		DB_OFFSET(tf_s[3]),	db_frame },
-	{ "s4",		DB_OFFSET(tf_s[4]),	db_frame },
-	{ "s5",		DB_OFFSET(tf_s[5]),	db_frame },
-	{ "s6",		DB_OFFSET(tf_s[6]),	db_frame },
-	{ "s7",		DB_OFFSET(tf_s[7]),	db_frame },
-	{ "s8",		DB_OFFSET(tf_s[8]),	db_frame },
-	{ "s9",		DB_OFFSET(tf_s[9]),	db_frame },
-	{ "s10",	DB_OFFSET(tf_s[10]),	db_frame },
-	{ "s11",	DB_OFFSET(tf_s[11]),	db_frame },
+	{ "sp",		DB_OFFSET(tf_sp),	db_frame },
 	{ "a0",		DB_OFFSET(tf_a[0]),	db_frame },
 	{ "a1",		DB_OFFSET(tf_a[1]),	db_frame },
 	{ "a2",		DB_OFFSET(tf_a[2]),	db_frame },
@@ -93,10 +77,29 @@ struct db_variable db_regs[] = {
 	{ "a5",		DB_OFFSET(tf_a[5]),	db_frame },
 	{ "a6",		DB_OFFSET(tf_a[6]),	db_frame },
 	{ "a7",		DB_OFFSET(tf_a[7]),	db_frame },
-	{ "sepc",	DB_OFFSET(tf_sepc),	db_frame },
-	{ "sstatus",	DB_OFFSET(tf_sstatus),	db_frame },
-	{ "stval",	DB_OFFSET(tf_stval),	db_frame },
-	{ "scause",	DB_OFFSET(tf_scause),	db_frame },
+	{ "t0",		DB_OFFSET(tf_t[0]),	db_frame },
+	{ "t1",		DB_OFFSET(tf_t[1]),	db_frame },
+	{ "t2",		DB_OFFSET(tf_t[2]),	db_frame },
+	{ "t3",		DB_OFFSET(tf_t[3]),	db_frame },
+	{ "t4",		DB_OFFSET(tf_t[4]),	db_frame },
+	{ "t5",		DB_OFFSET(tf_t[5]),	db_frame },
+	{ "t6",		DB_OFFSET(tf_t[6]),	db_frame },
+	{ "t7",		DB_OFFSET(tf_t[7]),	db_frame },
+	{ "t8",		DB_OFFSET(tf_t[8]),	db_frame },
+	{ "fp",		DB_OFFSET(tf_s[0]),	db_frame },
+	{ "s0",		DB_OFFSET(tf_s[1]),	db_frame },
+	{ "s1",		DB_OFFSET(tf_s[2]),	db_frame },
+	{ "s2",		DB_OFFSET(tf_s[3]),	db_frame },
+	{ "s3",		DB_OFFSET(tf_s[4]),	db_frame },
+	{ "s4",		DB_OFFSET(tf_s[5]),	db_frame },
+	{ "s5",		DB_OFFSET(tf_s[6]),	db_frame },
+	{ "s6",		DB_OFFSET(tf_s[7]),	db_frame },
+	{ "s7",		DB_OFFSET(tf_s[8]),	db_frame },
+	{ "era",	DB_OFFSET(tf_era),	db_frame },
+	{ "crmd",	DB_OFFSET(tf_crmd),	db_frame },
+	{ "prmd",	DB_OFFSET(tf_prmd),	db_frame },
+	{ "estat",	DB_OFFSET(tf_estat),	db_frame },
+	{ "badvaddr",	DB_OFFSET(tf_badvaddr),	db_frame },
 };
 
 struct db_variable *db_eregs = db_regs + nitems(db_regs);
@@ -106,7 +109,7 @@ db_show_mdpcpu(struct pcpu *pc)
 {
 	db_printf("curpmap      = %p\n", pc->pc_curpmap);
 	db_printf("pending_ipis = %x\n", pc->pc_pending_ipis);
-	db_printf("hart         = %u\n", pc->pc_hart);
+	db_printf("cpuid        = %u\n", pc->pc_hart);
 }
 
 /*
@@ -152,7 +155,7 @@ db_write_bytes(vm_offset_t addr, size_t size, char *data)
 			*dst++ = *data++;
 
 		/* Invalidate I-cache */
-		fence_i();
+		flush_icache();
 	}
 	(void)kdb_jmpbuf(prev_jb);
 

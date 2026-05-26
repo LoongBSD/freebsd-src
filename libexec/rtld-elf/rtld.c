@@ -532,6 +532,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	 * init_rtld has returned.  It is OK to reference file-scope statics
 	 * and string constants, and to call static and global functions.
 	 */
+	dlerror_dflt_init();
+	_rtld_error("E0");
 
 	/* Find the auxiliary vector on the stack. */
 	argcp = sp;
@@ -576,7 +578,11 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	assert(aux_info[AT_BASE] != NULL);
 	init_rtld((caddr_t)aux_info[AT_BASE]->a_un.a_ptr, aux_info);
 
-	dlerror_dflt_init();
+	/* D0: _rtld after init_rtld returns */
+	_rtld_error("D0");
+
+	rtld_printf("loongarch: _rtld after init_rtld, base=%p\n",
+	    (caddr_t)aux_info[AT_BASE]->a_un.a_ptr);
 
 	__progname = obj_rtld.path;
 	argv0 = argv[0] != NULL ? argv[0] : "(null)";
@@ -814,6 +820,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 			rtld_die();
 	}
 
+	rtld_printf("loongarch: _rtld main obj loaded, obj_main=%p path=%s\n",
+	    obj_main, obj_main->path);
+
 	if (aux_info[AT_EXECPATH] != NULL && fd == -1) {
 		kexecpath = aux_info[AT_EXECPATH]->a_un.a_ptr;
 		dbg("AT_EXECPATH %p %s", kexecpath, kexecpath);
@@ -935,6 +944,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	 * relocation processing.
 	 */
 	dbg("initializing initial thread local storage offsets");
+	rtld_printf("loongarch: _rtld before TLS offset alloc\n");
 	STAILQ_FOREACH(entry, &list_main, link) {
 		/*
 		 * Allocate all the initial objects out of the static TLS
@@ -961,9 +971,14 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		SYMLOOK_EARLY, NULL) == -1)
 		rtld_die();
 
+	rtld_printf("loongarch: _rtld after relocate_objects\n");
+
 	dbg("doing copy relocations");
 	if (do_copy_relocations(obj_main) == -1)
 		rtld_die();
+
+	rtld_printf("loongarch: _rtld after copy relocs, "
+	    "before ifunc_init\n");
 
 	if (ld_get_env_var(LD_DUMP_REL_POST) != NULL) {
 		dump_relocations(obj_main);
@@ -972,6 +987,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
 	ifunc_init(aux_info);
 
+	rtld_printf("loongarch: _rtld after ifunc_init, "
+	    "before allocate_initial_tls\n");
+
 	/*
 	 * Setup TLS for main thread.  This must be done after the
 	 * relocations are processed, since tls initialization section
@@ -979,6 +997,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	 */
 	dbg("initializing initial thread local storage");
 	allocate_initial_tls(globallist_curr(TAILQ_FIRST(&obj_list)));
+
+	rtld_printf("loongarch: _rtld after allocate_initial_tls\n");
 
 	dbg("initializing key program variables");
 	set_program_var("__progname", argv[0] != NULL ? basename(argv[0]) : "");
@@ -1075,6 +1095,23 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
 	Elf_Addr target;
 	RtldLockState lockstate;
 
+	/*
+	 * P1-4.2 DIAG: Validate obj pointer before any field access.
+	 * Crashes with r4=0/r4=1 in ld.d r4,r4,4 suggest corrupted
+	 * obj pointer passed from PLT trampoline.
+	 */
+	if (__predict_false(obj == NULL ||
+	    obj->magic != RTLD_MAGIC || obj->version != RTLD_VERSION)) {
+		rtld_fdprintf(STDERR_FILENO,
+		    "RTLD-DEBUG: _rtld_bind CORRUPTED-OBJ "
+		    "obj=%p magic=%#lx version=%lu reloff=%#lx\n",
+		    (const void *)obj,
+		    obj != NULL ? obj->magic : 0,
+		    obj != NULL ? obj->version : 0,
+		    (unsigned long)reloff);
+		rtld_die();
+	}
+
 relock:
 	rlock_acquire(rtld_bind_lock, &lockstate);
 	if (sigsetjmp(lockstate.env, 0) != 0)
@@ -1085,6 +1122,22 @@ relock:
 		rel = (const Elf_Rel *)((const char *)obj->pltrela + reloff);
 
 	where = (Elf_Addr *)(obj->relocbase + rel->r_offset);
+
+	/*
+	 * P1-3.2 DEBUG: DISABLED
+	 */
+	/*
+	rtld_fdprintf(STDERR_FILENO,
+	    "RTLD-DEBUG: _rtld_bind obj=%s reloff=%#lx "
+	    "r_offset=%#lx r_info=%#lx symnum=%lu type=%lu "
+	    "pltrel=%p pltrela=%p\n",
+	    obj->path, (unsigned long)reloff,
+	    (unsigned long)rel->r_offset, (unsigned long)rel->r_info,
+	    (unsigned long)ELF_R_SYM(rel->r_info),
+	    (unsigned long)ELF_R_TYPE(rel->r_info),
+	    (const void *)obj->pltrel, (const void *)obj->pltrela);
+	*/
+
 	def = find_symdef(ELF_R_SYM(rel->r_info), obj, &defobj, SYMLOOK_IN_PLT,
 	    NULL, &lockstate);
 	if (def == NULL)
@@ -2051,6 +2104,11 @@ find_symdef(unsigned long symnum, const Obj_Entry *refobj,
 	defobj = NULL;
 	ve = NULL;
 
+	/*rtld_printf("loongarch: find_symdef(%s, sym=%lu name=%s "
+	    "flags=%#x)\n",
+	    refobj->path, symnum, name, flags);
+	    */
+
 	/*
 	 * We don't have to do a full scale lookup if the symbol is local.
 	 * We know it will bind to the instance in this load module; to
@@ -2500,11 +2558,19 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	digest_dynamic1(&objtmp, 1, &dyn_rpath, &dyn_soname, &dyn_runpath);
 	assert(objtmp.needed == NULL);
 	assert(!objtmp.textrel);
+
+	/* D1: after digest, before relocate.  Check pltrela state. */
+	_rtld_error("D1: pltrel=%p pltrela=%p pltrelsize=%#zx pltrelasize=%#zx",
+	    (const void *)objtmp.pltrel, (const void *)objtmp.pltrela,
+	    (size_t)objtmp.pltrelsize, (size_t)objtmp.pltrelasize);
 	/*
 	 * Temporarily put the dynamic linker entry into the object list, so
 	 * that symbols can be found.
 	 */
 	relocate_objects(&objtmp, true, &objtmp, 0, NULL);
+
+	/* D2: after relocate_objects */
+	_rtld_error("D2");
 
 	ehdr = (Elf_Ehdr *)mapbase;
 	objtmp.phdr = (Elf_Phdr *)((char *)mapbase + ehdr->e_phoff);
@@ -2535,6 +2601,9 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	r_debug.r_brk = r_debug_state;
 	r_debug.r_state = RT_CONSISTENT;
 	r_debug.r_ldbase = obj_rtld.relocbase;
+
+	/* D3: init_rtld done */
+	_rtld_error("D3");
 }
 
 /*

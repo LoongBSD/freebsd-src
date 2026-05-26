@@ -2,6 +2,9 @@
  * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 Mitchell Horne <mhorne@FreeBSD.org>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,7 +39,7 @@
 #include <machine/frame.h>
 #include <machine/gdb_machdep.h>
 #include <machine/pcb.h>
-#include <machine/riscvreg.h>
+#include <machine/loongarchreg.h>
 
 #include <gdb/gdb.h>
 
@@ -47,32 +50,41 @@ gdb_cpu_getreg(int regnum, size_t *regsz)
 
 	if (kdb_thread == curthread) {
 		switch (regnum) {
+		case GDB_REG_ZERO:	static register_t zero = 0;
+					return (&zero);
 		case GDB_REG_RA:	return (&kdb_frame->tf_ra);
-		case GDB_REG_PC:	return (&kdb_frame->tf_sepc);
-		case GDB_REG_SSTATUS:	return (&kdb_frame->tf_sstatus);
-		case GDB_REG_STVAL:	return (&kdb_frame->tf_stval);
-		case GDB_REG_SCAUSE:	return (&kdb_frame->tf_scause);
+		case GDB_REG_TP:	return (&kdb_frame->tf_tp);
+		case GDB_REG_SP:	return (&kdb_frame->tf_sp);
+		case GDB_REG_FP:	return (&kdb_frame->tf_s[0]);
+		case GDB_REG_PC:	return (&kdb_frame->tf_era);
+		case GDB_REG_CRMD:	return (&kdb_frame->tf_crmd);
+		case GDB_REG_PRMD:	return (&kdb_frame->tf_prmd);
+		case GDB_REG_ESTAT:	return (&kdb_frame->tf_estat);
 		default:
-			if (regnum >= GDB_REG_A0 && regnum < GDB_REG_S2)
+			/* a0-a7: regnum 4-11 */
+			if (regnum >= GDB_REG_A0 && regnum < GDB_REG_A0 + 8)
 				return (&kdb_frame->tf_a[regnum - GDB_REG_A0]);
-			if (regnum >= GDB_REG_T0 && regnum < GDB_REG_FP)
+			/* t0-t8: regnum 12-20 */
+			if (regnum >= GDB_REG_T0 && regnum < GDB_REG_T0 + 9)
 				return (&kdb_frame->tf_t[regnum - GDB_REG_T0]);
-			if (regnum >= GDB_REG_T3 && regnum < GDB_REG_PC)
-				return (&kdb_frame->tf_t[regnum - GDB_REG_T3]);
+			/* s0-s8: regnum 23-31 */
+			if (regnum >= GDB_REG_S0 && regnum < GDB_REG_S0 + 9)
+				return (&kdb_frame->tf_s[regnum - GDB_REG_S0]);
 			break;
 		}
 	}
 	switch (regnum) {
-	case GDB_REG_PC: /* FALLTHROUGH */
-	case GDB_REG_RA: return (&kdb_thrctx->pcb_ra);
-	case GDB_REG_SP: return (&kdb_thrctx->pcb_sp);
-	case GDB_REG_GP: return (&kdb_thrctx->pcb_gp);
-	case GDB_REG_TP: return (&kdb_thrctx->pcb_tp);
-	case GDB_REG_FP: return (&kdb_thrctx->pcb_s[0]);
-	case GDB_REG_S1: return (&kdb_thrctx->pcb_s[1]);
+	case GDB_REG_ZERO:	static register_t zero = 0;
+				return (&zero);
+	case GDB_REG_RA:	return (&kdb_thrctx->pcb_ra);
+	case GDB_REG_TP:	return (&kdb_thrctx->pcb_tp);
+	case GDB_REG_SP:	return (&kdb_thrctx->pcb_sp);
+	case GDB_REG_FP:	return (&kdb_thrctx->pcb_s[0]);
+	case GDB_REG_PC:	return (&kdb_thrctx->pcb_ra);
 	default:
-		if (regnum >= GDB_REG_S2 && regnum < GDB_REG_T3)
-			return (&kdb_thrctx->pcb_s[regnum - GDB_REG_S2]);
+		/* s0-s8: regnum 23-31 */
+		if (regnum >= GDB_REG_S0 && regnum < GDB_REG_S0 + 9)
+			return (&kdb_thrctx->pcb_s[regnum - GDB_REG_S0]);
 		break;
 	}
 
@@ -87,39 +99,41 @@ gdb_cpu_setreg(int regnum, void *val)
 	/* For curthread, keep the pcb and trapframe in sync. */
 	if (kdb_thread == curthread) {
 		switch (regnum) {
-		case GDB_REG_PC:	kdb_frame->tf_sepc = regval; break;
+		case GDB_REG_ZERO:	/* $r0 is hardwired to zero, ignore writes */
+					break;
+		case GDB_REG_PC:	kdb_frame->tf_era = regval; break;
 		case GDB_REG_RA:	kdb_frame->tf_ra = regval; break;
 		case GDB_REG_SP:	kdb_frame->tf_sp = regval; break;
-		case GDB_REG_GP:	kdb_frame->tf_gp = regval; break;
 		case GDB_REG_TP:	kdb_frame->tf_tp = regval; break;
 		case GDB_REG_FP:	kdb_frame->tf_s[0] = regval; break;
-		case GDB_REG_S1:	kdb_frame->tf_s[1] = regval; break;
-		case GDB_REG_SSTATUS:	kdb_frame->tf_sstatus = regval; break;
-		case GDB_REG_STVAL:	kdb_frame->tf_stval = regval; break;
-		case GDB_REG_SCAUSE:	kdb_frame->tf_scause = regval; break;
+		case GDB_REG_CRMD:	kdb_frame->tf_crmd = regval; break;
+		case GDB_REG_PRMD:	kdb_frame->tf_prmd = regval; break;
+		case GDB_REG_ESTAT:	kdb_frame->tf_estat = regval; break;
 		default:
-			if (regnum >= GDB_REG_A0 && regnum < GDB_REG_S2)
+			/* a0-a7: regnum 4-11 */
+			if (regnum >= GDB_REG_A0 && regnum < GDB_REG_A0 + 8)
 				kdb_frame->tf_a[regnum - GDB_REG_A0] = regval;
-			if (regnum >= GDB_REG_S2 && regnum < GDB_REG_T3)
-				kdb_frame->tf_s[regnum - GDB_REG_S2] = regval;
-			if (regnum >= GDB_REG_T0 && regnum < GDB_REG_FP)
+			/* t0-t8: regnum 12-20 */
+			if (regnum >= GDB_REG_T0 && regnum < GDB_REG_T0 + 9)
 				kdb_frame->tf_t[regnum - GDB_REG_T0] = regval;
-			if (regnum >= GDB_REG_T3 && regnum < GDB_REG_PC)
-				kdb_frame->tf_t[regnum - GDB_REG_T3] = regval;
+			/* s0-s8: regnum 23-31 */
+			if (regnum >= GDB_REG_S0 && regnum < GDB_REG_S0 + 9)
+				kdb_frame->tf_s[regnum - GDB_REG_S0] = regval;
 			break;
 		}
 	}
 	switch (regnum) {
-	case GDB_REG_PC: /* FALLTHROUGH */
-	case GDB_REG_RA: kdb_thrctx->pcb_ra = regval; break;
-	case GDB_REG_SP: kdb_thrctx->pcb_sp = regval; break;
-	case GDB_REG_GP: kdb_thrctx->pcb_gp = regval; break;
-	case GDB_REG_TP: kdb_thrctx->pcb_tp = regval; break;
-	case GDB_REG_FP: kdb_thrctx->pcb_s[0] = regval; break;
-	case GDB_REG_S1: kdb_thrctx->pcb_s[1] = regval; break;
+	case GDB_REG_ZERO:	/* $r0 is hardwired to zero, ignore writes */
+				break;
+	case GDB_REG_PC:	kdb_thrctx->pcb_ra = regval; break;
+	case GDB_REG_RA:	kdb_thrctx->pcb_ra = regval; break;
+	case GDB_REG_SP:	kdb_thrctx->pcb_sp = regval; break;
+	case GDB_REG_TP:	kdb_thrctx->pcb_tp = regval; break;
+	case GDB_REG_FP:	kdb_thrctx->pcb_s[0] = regval; break;
 	default:
-		if (regnum >= GDB_REG_S2 && regnum < GDB_REG_T3)
-			kdb_thrctx->pcb_s[regnum - GDB_REG_S2] = regval;
+		/* s0-s8: regnum 23-31 */
+		if (regnum >= GDB_REG_S0 && regnum < GDB_REG_S0 + 9)
+			kdb_thrctx->pcb_s[regnum - GDB_REG_S0] = regval;
 		break;
 	}
 }
@@ -127,9 +141,23 @@ gdb_cpu_setreg(int regnum, void *val)
 int
 gdb_cpu_signal(int type, int code)
 {
-
-	if (type == SCAUSE_BREAKPOINT)
+	switch (type) {
+	case EXCCODE_BP:
+	case EXCCODE_WP:
 		return (SIGTRAP);
-
-	return (SIGEMT);
+	case EXCCODE_SYS:
+		return (SIGSYS);
+	case EXCCODE_INE:
+	case EXCCODE_IPE:
+		return (SIGILL);
+	case EXCCODE_TLBL:
+	case EXCCODE_TLBS:
+	case EXCCODE_ADE:
+	case EXCCODE_ALE:
+		return (SIGSEGV);
+	case EXCCODE_FPE:
+		return (SIGFPE);
+	default:
+		return (SIGEMT);
+	}
 }

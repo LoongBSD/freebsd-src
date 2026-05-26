@@ -1629,6 +1629,11 @@ vm_map_insert1(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    (cow & MAP_SPLIT_BOUNDARY_MASK) != 0,
 	    ("vm_map_insert: paradoxical MAP_NOFAULT request, obj %p cow %#x",
 	    object, cow));
+	if (__predict_false((prot & ~max) != 0)) {
+		printf("vm_map_insert: prot %#x max %#x start %#lx end %#lx "
+		    "object %p cow %#x\n", prot, max, (long)start, (long)end,
+		    object, cow);
+	}
 	KASSERT((prot & ~max) == 0,
 	    ("prot %#x is not subset of max_prot %#x", prot, max));
 

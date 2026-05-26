@@ -1248,6 +1248,12 @@ exec_map_stack(struct image_params *imgp)
 
 	stack_prot = sv->sv_shared_page_obj != NULL && imgp->stack_prot != 0 ?
 	    imgp->stack_prot : sv->sv_stackprot;
+
+	printf("DEV-DEBUG exec_map_stack: pid=%d sv_usrstack=%#lx ssiz=%#lx\n",
+	    p->p_pid, (unsigned long)sv->sv_usrstack, (unsigned long)ssiz);
+	printf("DEV-DEBUG exec_map_stack: map_min=%#lx map_max=%#lx\n",
+	    (unsigned long)vm_map_min(map), (unsigned long)vm_map_max(map));
+
 	if ((map->flags & MAP_ASLR_STACK) != 0) {
 		stack_addr = round_page((vm_offset_t)p->p_vmspace->vm_daddr +
 		    lim_max(curthread, RLIMIT_DATA));
@@ -1256,6 +1262,8 @@ exec_map_stack(struct image_params *imgp)
 		stack_addr = sv->sv_usrstack - ssiz;
 		find_space = VMFS_NO_SPACE;
 	}
+	printf("DEV-DEBUG exec_map_stack: stack_addr BEFORE vm_map_find=%#lx "
+	    "find_space=%d\n", (unsigned long)stack_addr, find_space);
 	error = vm_map_find(map, NULL, 0, &stack_addr, (vm_size_t)ssiz,
 	    sv->sv_usrstack, find_space, stack_prot, VM_PROT_ALL,
 	    MAP_STACK_AREA);
@@ -1265,6 +1273,9 @@ exec_map_stack(struct image_params *imgp)
 		    stack_prot, error, vm_mmap_to_errno(error));
 		return (vm_mmap_to_errno(error));
 	}
+
+	printf("DEV-DEBUG exec_map_stack: stack_addr AFTER vm_map_find=%#lx\n",
+	    (unsigned long)stack_addr);
 
 	stack_top = stack_addr + ssiz;
 	if ((map->flags & MAP_ASLR_STACK) != 0) {
@@ -1336,6 +1347,10 @@ out:
 	vmspace->vm_stacktop = stack_top;
 	vmspace->vm_ssize = sgrowsiz >> PAGE_SHIFT;
 	vmspace->vm_shp_base = sharedpage_addr;
+
+	printf("DEV-DEBUG exec_map_stack: DONE vm_stacktop=%#lx "
+	    "vm_maxsaddr=%#lx\n",
+	    (unsigned long)stack_top, (unsigned long)stack_addr);
 
 	return (0);
 }
@@ -1694,6 +1709,10 @@ exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	sysent = p->p_sysent;
 
 	destp =	PROC_PS_STRINGS(p);
+	printf("DEV-DEBUG exec_copyout_strings: pid=%d vm_stacktop=%#lx "
+	    "PROC_PS_STRINGS=%#lx\n",
+	    p->p_pid, (unsigned long)p->p_vmspace->vm_stacktop,
+	    (unsigned long)destp);
 	arginfo = imgp->ps_strings = (void *)destp;
 
 	/*

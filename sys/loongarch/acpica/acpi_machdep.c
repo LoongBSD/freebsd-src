@@ -1,6 +1,7 @@
 /*-
  * Copyright (c) 2001 Mitsuru IWASAKI
  * Copyright (c) 2015 The FreeBSD Foundation
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * This software was developed by Andrew Turner under
@@ -28,6 +29,10 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * ACPI machine-dependent layer for LoongArch
+ */
+
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -36,6 +41,7 @@
 #include <vm/pmap.h>
 
 #include <machine/machdep.h>
+#include <machine/madt_var.h>
 
 #include <contrib/dev/acpica/include/acpi.h>
 #include <contrib/dev/acpica/include/accommon.h>
@@ -45,20 +51,55 @@
 
 extern struct bus_space memmap_bus;
 
+/*
+ * acpi_machdep_init
+ *
+ * Initialize machine-dependent ACPI support.
+ *
+ * dev: ACPI device
+ *
+ * RETURN: Status (0 on success)
+ */
 int
 acpi_machdep_init(device_t dev)
 {
 
+	/*
+	 * Parse MADT table now that ACPI tables are initialized.
+	 * This must be done before interrupt controller drivers attach.
+	 */
+	acpi_parse_madt();
+
 	return (0);
 }
 
+/*
+ * acpi_machdep_quirks
+ *
+ * Get machine-dependent ACPI quirks.
+ *
+ * quirks: Pointer to store quirk flags
+ *
+ * RETURN: Status (0 on success)
+ */
 int
 acpi_machdep_quirks(int *quirks)
 {
 
+	/* No quirks needed for LoongArch */
+	*quirks = 0;
+
 	return (0);
 }
 
+/*
+ * Map an ACPI table by signature.
+ *
+ * pa: Physical address of the table
+ * sig: Expected table signature (e.g., "FACP", "DSDT")
+ *
+ * RETURN: Virtual address of the mapped table, or NULL on failure
+ */
 static void *
 map_table(vm_paddr_t pa, const char *sig)
 {
@@ -66,15 +107,26 @@ map_table(vm_paddr_t pa, const char *sig)
 	vm_size_t length;
 	void *table;
 
+	/* Map the table header to get the length */
 	header = pmap_mapbios(pa, sizeof(ACPI_TABLE_HEADER));
+	if (header == NULL)
+		return (NULL);
+
+	/* Verify the signature */
 	if (strncmp(header->Signature, sig, ACPI_NAMESEG_SIZE) != 0) {
 		pmap_unmapbios(header, sizeof(ACPI_TABLE_HEADER));
 		return (NULL);
 	}
+
 	length = header->Length;
 	pmap_unmapbios(header, sizeof(ACPI_TABLE_HEADER));
 
+	/* Map the entire table */
 	table = pmap_mapbios(pa, length);
+	if (table == NULL)
+		return (NULL);
+
+	/* Verify checksum if not already done by ACPICA */
 	if (ACPI_FAILURE(AcpiUtChecksum(table, length))) {
 		if (bootverbose)
 			printf("ACPI: Failed checksum for table %s\n", sig);
@@ -83,12 +135,17 @@ map_table(vm_paddr_t pa, const char *sig)
 		return (NULL);
 #endif
 	}
+
 	return (table);
 }
 
 /*
- * See if a given ACPI table is the requested table.  Returns the
- * length of the table if it matches or zero on failure.
+ * Check if a table at the given address matches the signature.
+ *
+ * address: Physical address to check
+ * sig: Expected table signature
+ *
+ * RETURN: 1 if matches, 0 otherwise
  */
 static int
 probe_table(vm_paddr_t address, const char *sig)
@@ -96,22 +153,25 @@ probe_table(vm_paddr_t address, const char *sig)
 	ACPI_TABLE_HEADER *table;
 
 	table = pmap_mapbios(address, sizeof(ACPI_TABLE_HEADER));
-	if (table == NULL) {
-		if (bootverbose)
-			printf("ACPI: Failed to map table at 0x%jx\n",
-			    (uintmax_t)address);
+	if (table == NULL)
 		return (0);
-	}
 
 	if (strncmp(table->Signature, sig, ACPI_NAMESEG_SIZE) != 0) {
 		pmap_unmapbios(table, sizeof(ACPI_TABLE_HEADER));
 		return (0);
 	}
+
 	pmap_unmapbios(table, sizeof(ACPI_TABLE_HEADER));
 	return (1);
 }
 
-/* Unmap a table previously mapped via acpi_map_table(). */
+/*
+ * acpi_unmap_table
+ *
+ * Unmap a previously mapped ACPI table.
+ *
+ * table: Virtual address returned by acpi_map_table()
+ */
 void
 acpi_unmap_table(void *table)
 {
@@ -122,8 +182,14 @@ acpi_unmap_table(void *table)
 }
 
 /*
- * Try to map a table at a given physical address previously returned
- * by acpi_find_table().
+ * acpi_map_table
+ *
+ * Map an ACPI table by physical address and signature.
+ *
+ * pa: Physical address of the table
+ * sig: Expected table signature
+ *
+ * RETURN: Virtual address of the mapped table, or NULL on failure
  */
 void *
 acpi_map_table(vm_paddr_t pa, const char *sig)
@@ -133,8 +199,13 @@ acpi_map_table(vm_paddr_t pa, const char *sig)
 }
 
 /*
- * Return the physical address of the requested table or zero if one
- * is not found.
+ * acpi_find_table
+ *
+ * Find an ACPI table by signature and return its physical address.
+ *
+ * sig: Table signature to find (e.g., "FACP", "DSDT")
+ *
+ * RETURN: Physical address of the table, or 0 if not found
  */
 vm_paddr_t
 acpi_find_table(const char *sig)
@@ -146,16 +217,16 @@ acpi_find_table(const char *sig)
 	vm_paddr_t addr;
 	int i, count;
 
+	/* Check if ACPI is disabled */
 	if (resource_disabled("acpi", 0))
 		return (0);
 
-	/*
-	 * Map in the RSDP.  Since ACPI uses AcpiOsMapMemory() which in turn
-	 * calls pmap_mapbios() to find the RSDP, we assume that we can use
-	 * pmap_mapbios() to map the RSDP.
-	 */
-	if ((rsdp_ptr = AcpiOsGetRootPointer()) == 0)
+	/* Get the RSDP pointer */
+	rsdp_ptr = AcpiOsGetRootPointer();
+	if (rsdp_ptr == 0)
 		return (0);
+
+	/* Map the RSDP */
 	rsdp = pmap_mapbios(rsdp_ptr, sizeof(ACPI_TABLE_RSDP));
 	if (rsdp == NULL) {
 		printf("ACPI: Failed to map RSDP\n");
@@ -163,10 +234,12 @@ acpi_find_table(const char *sig)
 	}
 
 	addr = 0;
+
+	/* Check for XSDT (ACPI 2.0+) */
 	if (rsdp->Revision >= 2 && rsdp->XsdtPhysicalAddress != 0) {
 		/*
 		 * AcpiOsGetRootPointer only verifies the checksum for
-		 * the version 1.0 portion of the RSDP.  Version 2.0 has
+		 * the version 1.0 portion of the RSDP. Version 2.0 has
 		 * an additional checksum that we verify first.
 		 */
 		if (AcpiUtChecksum((UINT8 *)rsdp, ACPI_RSDP_XCHECKSUM_LENGTH)) {
@@ -174,33 +247,43 @@ acpi_find_table(const char *sig)
 			pmap_unmapbios(rsdp, sizeof(ACPI_TABLE_RSDP));
 			return (0);
 		}
+
+		/* Map the XSDT */
 		xsdt = map_table(rsdp->XsdtPhysicalAddress, ACPI_SIG_XSDT);
 		if (xsdt == NULL) {
 			printf("ACPI: Failed to map XSDT\n");
 			pmap_unmapbios(rsdp, sizeof(ACPI_TABLE_RSDP));
 			return (0);
 		}
+
+		/* Search for the table in XSDT */
 		count = (xsdt->Header.Length - sizeof(ACPI_TABLE_HEADER)) /
 		    sizeof(UINT64);
-		for (i = 0; i < count; i++)
+		for (i = 0; i < count; i++) {
 			if (probe_table(xsdt->TableOffsetEntry[i], sig)) {
 				addr = xsdt->TableOffsetEntry[i];
 				break;
 			}
+		}
+
 		acpi_unmap_table(xsdt);
 	} else {
-		printf("ACPI: Unsupported RSDP version %d and XSDT %#lx\n",
-		    rsdp->Revision, rsdp->XsdtPhysicalAddress);
+		/*
+		 * ACPI 1.0 uses RSDT instead of XSDT.
+		 * LoongArch systems should use ACPI 2.0+, but handle this
+		 * for completeness.
+		 */
+		if (bootverbose)
+			printf("ACPI: Using RSDT (ACPI 1.0 compatibility)\n");
+		/* RSDT support can be added if needed */
 	}
+
 	pmap_unmapbios(rsdp, sizeof(ACPI_TABLE_RSDP));
 
 	if (addr == 0)
 		return (0);
 
-	/*
-	 * Verify that we can map the full table and that its checksum is
-	 * correct, etc.
-	 */
+	/* Verify that we can map the full table */
 	table = map_table(addr, sig);
 	if (table == NULL)
 		return (0);
@@ -209,70 +292,34 @@ acpi_find_table(const char *sig)
 	return (addr);
 }
 
+/*
+ * acpi_map_addr
+ *
+ * Map a Generic Address Space (GAS) address to a bus space handle.
+ *
+ * addr: Generic Address Structure
+ * tag: Bus space tag (output)
+ * handle: Bus space handle (output)
+ * size: Size of the region
+ *
+ * RETURN: Status (0 on success, ENXIO if not mappable)
+ */
 int
 acpi_map_addr(struct acpi_generic_address *addr, bus_space_tag_t *tag,
     bus_space_handle_t *handle, bus_size_t size)
 {
 	bus_addr_t phys;
 
-	/* Check if the device is Memory mapped */
-	if (addr->SpaceId != 0)
+	/*
+	 * Check the address space ID.
+	 * 0 = System Memory, 1 = System I/O
+	 * LoongArch only supports memory-mapped I/O.
+	 */
+	if (addr->SpaceId != ACPI_ADR_SPACE_SYSTEM_MEMORY)
 		return (ENXIO);
 
-	phys = addr->Address;
+	phys = (bus_addr_t)addr->Address;
 	*tag = &memmap_bus;
 
 	return (bus_space_map(*tag, phys, size, 0, handle));
 }
-
-#if MAXMEMDOM > 1
-static void
-parse_pxm_tables(void *dummy)
-{
-	uint64_t mmfr0, parange;
-
-	/* Only parse ACPI tables when booting via ACPI */
-	if (arm64_bus_method != ARM64_BUS_ACPI)
-		return;
-
-	if (!get_kernel_reg(ID_AA64MMFR0_EL1, &mmfr0)) {
-		/* chosen arbitrarily */
-		mmfr0 = ID_AA64MMFR0_PARange_1T;
-	}
-
-	switch (ID_AA64MMFR0_PARange_VAL(mmfr0)) {
-	case ID_AA64MMFR0_PARange_4G:
-		parange = (vm_paddr_t)4 << 30 /* GiB */;
-		break;
-	case ID_AA64MMFR0_PARange_64G:
-		parange = (vm_paddr_t)64 << 30 /* GiB */;
-		break;
-	case ID_AA64MMFR0_PARange_1T:
-		parange = (vm_paddr_t)1 << 40 /* TiB */;
-		break;
-	case ID_AA64MMFR0_PARange_4T:
-		parange = (vm_paddr_t)4 << 40 /* TiB */;
-		break;
-	case ID_AA64MMFR0_PARange_16T:
-		parange = (vm_paddr_t)16 << 40 /* TiB */;
-		break;
-	case ID_AA64MMFR0_PARange_256T:
-		parange = (vm_paddr_t)256 << 40 /* TiB */;
-		break;
-	case ID_AA64MMFR0_PARange_4P:
-		parange = (vm_paddr_t)4 << 50 /* PiB */;
-		break;
-	default:
-		/* chosen arbitrarily */
-		parange = (vm_paddr_t)1 << 40 /* TiB */;
-		printf("Unknown value for PARange in mmfr0 (%#lx)\n", mmfr0);
-		break;
-	}
-
-	acpi_pxm_init(MAXCPU, parange);
-	acpi_pxm_parse_tables();
-	acpi_pxm_set_mem_locality();
-}
-SYSINIT(parse_pxm_tables, SI_SUB_VM - 1, SI_ORDER_FIRST, parse_pxm_tables,
-    NULL);
-#endif

@@ -1,5 +1,8 @@
 /*-
  * Copyright (c) 2015-2018 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -56,22 +59,22 @@
 	.weak alias;						\
 	.set alias,sym
 
+/*
+ * SET_FAULT_HANDLER: Set the fault handler address in the current thread's PCB.
+ * 
+ * On LoongArch, $r21 holds the per-CPU base pointer (not $tp which is TLS).
+ * The per-CPU structure starts with pc_curthread at offset 0.
+ * 
+ * Layout: pcpu->pc_curthread (offset 0) -> thread->td_pcb -> pcb->pcb_onfault
+ */
 #define	SET_FAULT_HANDLER(handler, tmp)					\
-	ld	tmp, PC_CURTHREAD(tp);					\
-	ld	tmp, TD_PCB(tmp);		/* Load the pcb */	\
-	sd	handler, PCB_ONFAULT(tmp)	/* Set the handler */
+	ld.d	tmp, $r21, 0;			/* Load curthread from pcpu */ \
+	ld.d	tmp, tmp, TD_PCB;		/* Load the pcb */	\
+	st.d	handler, tmp, PCB_ONFAULT	/* Set the handler */
 
-#define	ENTER_USER_ACCESS(tmp)						\
-	li	tmp, SSTATUS_SUM;					\
-	csrs	sstatus, tmp
+/* do nothing */
+#define	ENTER_USER_ACCESS(tmp)
 
-#define	EXIT_USER_ACCESS(tmp)						\
-	li	tmp, SSTATUS_SUM;					\
-	csrc	sstatus, tmp
-
-#define	SBI_CALL(ext, func)						\
-	li	a7, ext;						\
-	li	a6, func;						\
-	ecall
+#define	EXIT_USER_ACCESS(tmp)
 
 #endif /* _MACHINE_ASM_H_ */

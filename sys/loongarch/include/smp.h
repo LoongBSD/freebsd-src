@@ -44,7 +44,7 @@ enum {
 	IPI_STOP,
 	IPI_STOP_HARD,
 	IPI_HARDCLOCK,
-	INTR_IPI_COUNT
+	INTR_IPI_COUNT,
 };
 
 void ipi_all_but_self(u_int ipi);

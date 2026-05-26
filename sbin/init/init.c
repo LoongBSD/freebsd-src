@@ -251,19 +251,32 @@ invalid:
 	 * Does 'init' deserve its own facility number?
 	 */
 	openlog("init", LOG_CONS, LOG_AUTH);
+	{
+		int fd = open(_PATH_CONSOLE, O_WRONLY);
+		if (fd >= 0) { write(fd, "INIT-DBG: after openlog\n", 24); close(fd); }
+	}
 
-	/*
-	 * Create an initial session.
-	 */
+	{
+		int fd = open(_PATH_CONSOLE, O_WRONLY);
+		if (fd >= 0) { write(fd, "INIT-DBG: calling setsid\n", 25); close(fd); }
+	}
 	if (setsid() < 0 && (errno != EPERM || getsid(0) != 1))
 		warning("initial setsid() failed: %m");
+	{
+		int fd = open(_PATH_CONSOLE, O_WRONLY);
+		if (fd >= 0) { write(fd, "INIT-DBG: after setsid\n", 23); close(fd); }
+	}
 
-	/*
-	 * Establish an initial user so that programs running
-	 * single user do not freak out and die (like passwd).
-	 */
+	{
+		int fd = open(_PATH_CONSOLE, O_WRONLY);
+		if (fd >= 0) { write(fd, "INIT-DBG: calling setlogin\n", 27); close(fd); }
+	}
 	if (setlogin("root") < 0)
 		warning("setlogin() failed: %m");
+	{
+		int fd = open(_PATH_CONSOLE, O_WRONLY);
+		if (fd >= 0) { write(fd, "INIT-DBG: after setlogin\n", 25); close(fd); }
+	}
 
 	/*
 	 * This code assumes that we always get arguments through flags,
@@ -310,6 +323,7 @@ invalid:
 	sa.sa_handler = SIG_IGN;
 	sigaction(SIGTTIN, &sa, NULL);
 	sigaction(SIGTTOU, &sa, NULL);
+	printf("INIT-DBG: after signal setup\n"); fflush(stdout);
 
 	/*
 	 * Paranoia.
@@ -317,6 +331,14 @@ invalid:
 	close(0);
 	close(1);
 	close(2);
+	/* After close(0/1/2), reopen console for debug output */
+	{
+		int dbgfd = open(_PATH_CONSOLE, O_WRONLY);
+		if (dbgfd >= 0) {
+			write(dbgfd, "INIT-DBG: after close+reopen\n", 29);
+			/* Keep dbgfd for later use */
+		}
+	}
 
 	if (kenv(KENV_GET, "init_exec", kenv_value, sizeof(kenv_value)) > 0) {
 		replace_init(kenv_value);
@@ -401,6 +423,13 @@ invalid:
 	/*
 	 * Start the state machine.
 	 */
+	{
+		int fd = open(_PATH_CONSOLE, O_WRONLY);
+		if (fd >= 0) {
+			write(fd, "INIT-DBG: before transition\n", 28);
+			close(fd);
+		}
+	}
 	transition(initial_transition);
 
 	/*
@@ -852,6 +881,7 @@ single_user(void)
 	char *argv[2];
 	struct timeval tv, tn;
 	struct passwd *pp;
+	int dbgfd;
 #ifdef SECURE
 	struct ttyent *typ;
 	static const char banner[] =
@@ -861,6 +891,12 @@ single_user(void)
 #ifdef DEBUGSHELL
 	char altshell[128];
 #endif
+
+	dbgfd = open(_PATH_CONSOLE, O_WRONLY);
+	if (dbgfd >= 0) {
+		write(dbgfd, "INIT-DBG: single_user() entered\n", 32);
+		close(dbgfd);
+	}
 
 	if (Reboot) {
 		/* Instead of going single user, let's reboot the machine */
@@ -1025,6 +1061,13 @@ static state_func_t
 runcom(void)
 {
 	state_func_t next_transition;
+	int fd;
+
+	fd = open(_PATH_CONSOLE, O_WRONLY);
+	if (fd >= 0) {
+		write(fd, "INIT-DBG: runcom() entered\n", 27);
+		close(fd);
+	}
 
 	BOOTTRACE("/etc/rc starting...");
 	if ((next_transition = run_script(_PATH_RUNCOM)) != NULL)
@@ -1115,6 +1158,16 @@ run_script(const char *script)
 	int status;
 	char *argv[SCRIPT_ARGV_SIZE];
 	const char *shell;
+	int dbgfd;
+
+	dbgfd = open(_PATH_CONSOLE, O_WRONLY);
+	if (dbgfd >= 0) {
+		char buf[128];
+		int len = snprintf(buf, sizeof(buf),
+		    "INIT-DBG: run_script(%s)\n", script);
+		write(dbgfd, buf, len);
+		close(dbgfd);
+	}
 
 	shell = get_shell();
 

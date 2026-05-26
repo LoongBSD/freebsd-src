@@ -184,6 +184,8 @@ uart_cpu_fdt_probe(struct uart_class **classp, bus_space_tag_t *bst,
 	char *cp = NULL;
 	int err;
 
+	*(volatile uint8_t *)0x800000001FE001E0UL = 'u';
+
 	/* Has the user forced a specific device node? */
 	switch (devtype) {
 	case UART_DEV_DBGPORT:
@@ -204,6 +206,7 @@ uart_cpu_fdt_probe(struct uart_class **classp, bus_space_tag_t *bst,
 		 */
 		node = -1;
 		if ((chosen = OF_finddevice("/chosen")) != -1) {
+			*(volatile uint8_t *)0x800000001FE001E0UL = 'v';
 			for (; *name != NULL; name++) {
 				if (phandle_chosen_propdev(chosen, *name,
 				    &node) == 0)
@@ -215,6 +218,7 @@ uart_cpu_fdt_probe(struct uart_class **classp, bus_space_tag_t *bst,
 	} else {
 		node = OF_finddevice(cp);
 	}
+	*(volatile uint8_t *)0x800000001FE001E0UL = 'w';
 
 	if (node == -1)
 		return (ENXIO);

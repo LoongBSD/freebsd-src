@@ -156,6 +156,7 @@ cninit(void)
 	struct consdev *best_cn, *cn, **list;
 
 	TSENTER();
+	*(volatile uint8_t *)0x800000001FE001E0UL = 'A';
 	/*
 	 * Check if we should mute the console (for security reasons perhaps)
 	 * It can be changes dynamically using sysctl kern.consmute
@@ -174,6 +175,7 @@ cninit(void)
 	 * here.
 	 */
 	kbdinit();
+	*(volatile uint8_t *)0x800000001FE001E0UL = 'B';
 
 	/*
 	 * Find the first console with the highest priority.
@@ -198,12 +200,14 @@ cninit(void)
 			cnadd(cn);
 		}
 	}
+	*(volatile uint8_t *)0x800000001FE001E0UL = 'C';
 	if (best_cn == NULL)
 		return;
 	if ((boothowto & RB_MULTIPLE) == 0) {
 		best_cn->cn_ops->cn_init(best_cn);
 		cnadd(best_cn);
 	}
+	*(volatile uint8_t *)0x800000001FE001E0UL = 'D';
 	if (boothowto & RB_PAUSE)
 		console_pausing = true;
 	/*

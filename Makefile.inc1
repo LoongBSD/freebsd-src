@@ -152,6 +152,7 @@ KNOWN_ARCHES?=	aarch64/arm64 \
 		powerpc64/powerpc \
 		powerpc64le/powerpc \
 		powerpcspe/powerpc \
+		loongarch64/loongarch \
 		riscv64/riscv
 
 .if ${TARGET} == ${TARGET_ARCH}
@@ -825,7 +826,7 @@ XMAKE=		${BMAKE} \
 		TARGET=${TARGET} TARGET_ARCH=${TARGET_ARCH} \
 		MK_CLANG=${MK_CLANG_BOOTSTRAP} \
 		MK_LLDB=no \
-		MK_LLVM_BINUTILS=no \
+		MK_LLVM_BINUTILS=${MK_LLVM_BINUTILS} \
 		MK_TESTS=no
 
 # kernel-tools stage
@@ -3003,7 +3004,11 @@ _lld=		usr.bin/clang/lld
 .endif
 .if ${MK_CLANG_BOOTSTRAP} != "no" || ${MK_LLD_BOOTSTRAP} != "no"
 _clang_libs=	lib/clang
+.else
+# Need libllvm for llvm-objdump even if not bootstrapping clang/lld
+_clang_libs=	lib/clang/libllvm
 .endif
+_llvm_binutils=	usr.bin/clang/llvm-objdump
 .if ${MK_USB} != "no"
 _usb_tools=	stand/usb/tools
 .endif
@@ -3019,6 +3024,7 @@ cross-tools: .MAKE .PHONY
     ${_clang_libs} \
     ${_clang} \
     ${_lld} \
+    ${_llvm_binutils} \
     ${_elftctools} \
     ${_dtrace_tools} \
     ${_btxld} \

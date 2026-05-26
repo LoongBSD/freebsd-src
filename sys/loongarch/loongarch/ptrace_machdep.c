@@ -1,6 +1,8 @@
 /*-
  * Copyright (c) 2014 Andrew Turner
  * Copyright (c) 2015-2017 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -33,6 +35,7 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/exec.h>
@@ -57,15 +60,14 @@
 #include <machine/cpu.h>
 #include <machine/pcb.h>
 #include <machine/pte.h>
-#include <machine/riscvreg.h>
-#include <machine/sbi.h>
+#include <machine/loongarchreg.h>
 #include <machine/trap.h>
 
 int
 ptrace_set_pc(struct thread *td, u_long addr)
 {
 
-	td->td_frame->tf_sepc = addr;
+	td->td_frame->tf_regs[1] = addr;
 	return (0);
 }
 

@@ -1,9 +1,16 @@
 
-#NO_UNIVERSE
-
 include "GENERIC"
 
 ident QEMU
 
-options 	HZ=100
-options 	ROOTDEVNAME=\"ufs:/dev/vtbd0\"
+options         HZ=100
+
+# Force single CPU for early boot testing
+#options         MAXCPU=1
+
+# Uncomment for memory disk
+#options       MD_ROOT
+#options       MD_ROOT_SIZE=32768      # 32MB ram disk
+#makeoptions   MFS_IMAGE=/home/gehaowu/FreeBSD/mdroot.img
+#options       ROOTDEVNAME=\"ufs:/dev/md0\"
+options		ROOTDEVNAME=\"ufs:/dev/vtbd0p2\"

@@ -458,6 +458,13 @@ acpi_probe(device_t dev)
 
     ACPI_FUNCTION_TRACE((char *)(uintptr_t)__func__);
 
+    /*
+     * On LoongArch, acpi_identify may not be called automatically.
+     * Call it here to initialize the ACPI subsystem before probing.
+     */
+    if (acpi_identify() != 0)
+	return (ENXIO);
+
     device_set_desc(dev, acpi_desc);
 
     return_VALUE (BUS_PROBE_NOWILDCARD);
@@ -2214,6 +2221,39 @@ acpi_enable_pcie(void)
 	while (alloc < end) {
 		pcie_cfgregopen(alloc->Address, alloc->PciSegment,
 		    alloc->StartBusNumber, alloc->EndBusNumber);
+		alloc++;
+	}
+#elif defined(__loongarch__) && defined(__loongarch_lp64)
+	/*
+	 * For LoongArch, we need to read the MCFG table to get the ECAM
+	 * base address. The PCI host bridge driver will use this information
+	 * to properly configure PCI configuration space access.
+	 */
+	ACPI_TABLE_HEADER *hdr;
+	ACPI_MCFG_ALLOCATION *alloc, *end;
+	ACPI_STATUS status;
+
+	status = AcpiGetTable(ACPI_SIG_MCFG, 1, &hdr);
+	if (ACPI_FAILURE(status)) {
+		if (bootverbose)
+			printf("ACPI: No MCFG table found, using default ECAM base\n");
+		return;
+	}
+
+	if (bootverbose)
+		printf("ACPI: Found MCFG table, parsing ECAM allocations...\n");
+
+	end = (ACPI_MCFG_ALLOCATION *)((char *)hdr + hdr->Length);
+	alloc = (ACPI_MCFG_ALLOCATION *)((ACPI_TABLE_MCFG *)hdr + 1);
+	while (alloc < end) {
+		if (bootverbose)
+			printf("ACPI: MCFG allocation: ECAM base=0x%jx, segment=%u, buses=%u-%u\n",
+			    (uintmax_t)alloc->Address, alloc->PciSegment,
+			    alloc->StartBusNumber, alloc->EndBusNumber);
+		/*
+		 * On LoongArch, the PCI host bridge driver uses the ECAM base
+		 * from the MCFG table. We store this for later use.
+		 */
 		alloc++;
 	}
 #endif

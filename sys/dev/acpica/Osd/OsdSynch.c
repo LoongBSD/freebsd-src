@@ -291,8 +291,10 @@ AcpiOsCreateMutex(ACPI_MUTEX *OutHandle)
 	if (OutHandle == NULL)
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 
-	if ((am = malloc(sizeof(*am), M_ACPISEM, M_NOWAIT | M_ZERO)) == NULL)
+	if ((am = malloc(sizeof(*am), M_ACPISEM, M_NOWAIT | M_ZERO)) == NULL) {
+		printf("DEBUG: AcpiOsCreateMutex: malloc failed\n");
 		return_ACPI_STATUS (AE_NO_MEMORY);
+	}
 
 	snprintf(am->am_name, sizeof(am->am_name), "ACPI mutex (%p)", am);
 	mtx_init(&am->am_lock, am->am_name, NULL, MTX_DEF);
@@ -363,8 +365,10 @@ AcpiOsAcquireMutex(ACPI_MUTEX Handle, UINT16 Timeout)
 
 	ACPI_FUNCTION_TRACE((char *)(uintptr_t)__func__);
 
-	if (am == NULL)
+	if (am == NULL) {
+		printf("DEBUG: AcpiOsAcquireMutex: Handle is NULL\n");
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
+	}
 
 	mtx_lock(&am->am_lock);
 

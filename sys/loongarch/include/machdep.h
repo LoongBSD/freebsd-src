@@ -1,5 +1,8 @@
 /*-
  * Copyright (c) 2015-2017 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -35,13 +38,31 @@
 #ifndef _MACHINE_MACHDEP_H_
 #define	_MACHINE_MACHDEP_H_
 
-struct riscv_bootparams {
+#ifdef _KERNEL
+
+/*
+ * Bus method enumeration for ACPI/FDT selection
+ */
+enum loongarch_bus {
+	LOONGARCH_BUS_NONE,
+	LOONGARCH_BUS_FDT,
+	LOONGARCH_BUS_ACPI,
+};
+
+extern enum loongarch_bus loongarch_bus_method;
+
+struct loongarch_bootparams {
+	vm_offset_t	kern_l1pt;	/* Kernel L1 base */
 	vm_offset_t	kern_phys;	/* Kernel base (physical) addr */
 	vm_offset_t	kern_stack;
+	vm_offset_t	dtbp_virt;	/* Device tree blob virtual addr */
 	vm_offset_t	dtbp_phys;	/* Device tree blob physical addr */
 	vm_offset_t	modulep;	/* loader(8) metadata */
 };
 
-void initriscv(struct riscv_bootparams *);
+void initloongarch(struct loongarch_bootparams *);
+bool bus_probe(void);
+
+#endif /* _KERNEL */
 
 #endif /* _MACHINE_MACHDEP_H_ */

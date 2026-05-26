@@ -20,6 +20,7 @@
  * CDDL HEADER END
  *
  * Portions Copyright 2016-2018 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  *
  */
 /*
@@ -38,8 +39,7 @@
 #include <sys/dtrace_bsd.h>
 #include <cddl/dev/dtrace/dtrace_cddl.h>
 #include <machine/vmparam.h>
-#include <machine/encoding.h>
-#include <machine/riscvreg.h>
+#include <machine/loongarchreg.h>
 #include <machine/clock.h>
 #include <machine/frame.h>
 #include <machine/trap.h>
@@ -155,7 +155,7 @@ dtrace_gethrestime(void)
 	return (current_time.tv_sec * 1000000000UL + current_time.tv_nsec);
 }
 
-/* Function to handle DTrace traps during probes. See riscv/riscv/trap.c */
+/* Function to handle DTrace traps during probes. See loongarch/loongarch/trap.c */
 int
 dtrace_trap(struct trapframe *frame, u_int type)
 {
@@ -174,22 +174,21 @@ dtrace_trap(struct trapframe *frame, u_int type)
 		 * All the rest will be handled in the usual way.
 		 */
 		switch (type) {
-		case SCAUSE_LOAD_ACCESS_FAULT:
-		case SCAUSE_STORE_ACCESS_FAULT:
-		case SCAUSE_INST_ACCESS_FAULT:
-		case SCAUSE_INST_PAGE_FAULT:
-		case SCAUSE_LOAD_PAGE_FAULT:
-		case SCAUSE_STORE_PAGE_FAULT:
+		case EXCCODE_TLBL:
+		case EXCCODE_TLBS:
+		case EXCCODE_TLBI:
+		case EXCCODE_ADE:
+		case EXCCODE_ALE:
 			/* Flag a bad address. */
 			cpu_core[curcpu].cpuc_dtrace_flags |= CPU_DTRACE_BADADDR;
-			cpu_core[curcpu].cpuc_dtrace_illval = frame->tf_stval;
+			cpu_core[curcpu].cpuc_dtrace_illval = frame->tf_badvaddr;
 
 			/*
 			 * Offset the instruction pointer to the instruction
 			 * following the one causing the fault.
 			 */
-			frame->tf_sepc +=
-			    dtrace_instr_size((uint8_t *)frame->tf_sepc);
+			frame->tf_era +=
+			    dtrace_instr_size((uint8_t *)frame->tf_era);
 
 			return (1);
 		default:
@@ -215,59 +214,19 @@ dtrace_probe_error(dtrace_state_t *state, dtrace_epid_t epid, int which,
 static int
 dtrace_invop_start(struct trapframe *frame)
 {
-	register_t *sp;
-	uint32_t uimm;
-	uint32_t imm;
 	int invop;
 
-	invop = dtrace_invop(frame->tf_sepc, frame);
+	invop = dtrace_invop(frame->tf_era, frame);
 	if (invop == 0)
 		return (-1);
 
-	if (dtrace_match_opcode(invop, (MATCH_SD | RS2_RA | RS1_SP),
-	    (MASK_SD | RS2_MASK | RS1_MASK))) {
-		/* Non-compressed store of ra to sp */
-		imm = (invop >> 7) & 0x1f;
-		imm |= ((invop >> 25) & 0x7f) << 5;
-		sp = (register_t *)((uint8_t *)frame->tf_sp + imm);
-		*sp = frame->tf_ra;
-		frame->tf_sepc += INSN_SIZE;
-		return (0);
-	}
-
-	if (dtrace_match_opcode(invop, (MATCH_JALR | (X_RA << RS1_SHIFT)),
-	    (MASK_JALR | RD_MASK | RS1_MASK | IMM_MASK))) {
-		/* Non-compressed ret */
-		frame->tf_sepc = frame->tf_ra;
-		return (0);
-	}
-
-	if (dtrace_match_opcode(invop, (MATCH_C_SDSP | RS2_C_RA),
-	    (MASK_C_SDSP | RS2_C_MASK))) {
-		/* 'C'-compressed store of ra to sp */
-		uimm = ((invop >> 10) & 0x7) << 3;
-		uimm |= ((invop >> 7) & 0x7) << 6;
-		sp = (register_t *)((uint8_t *)frame->tf_sp + uimm);
-		*sp = frame->tf_ra;
-		frame->tf_sepc += INSN_C_SIZE;
-		return (0);
-	}
-
-	if (dtrace_match_opcode(invop, (MATCH_C_JR | (X_RA << RD_SHIFT)),
-	    (MASK_C_JR | RD_MASK))) {
-		/* 'C'-compressed ret */
-		frame->tf_sepc = frame->tf_ra;
-		return (0);
-	}
-
-	if (dtrace_match_opcode(invop, MATCH_C_NOP, MASK_C_NOP))
-		return (0);
-
-#ifdef INVARIANTS
-	panic("Instruction %x doesn't match any opcode.", invop);
-#endif
-
-	return (-1);
+	/*
+	 * LoongArch instruction handling for DTrace.
+	 * TODO: Implement proper instruction matching for LoongArch.
+	 * Currently just skip the instruction.
+	 */
+	frame->tf_era += 4;
+	return (0);
 }
 
 void

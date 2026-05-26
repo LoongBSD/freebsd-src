@@ -888,6 +888,16 @@ check_acpi_spcr(void)
 		else {
 			mm = spcr->SerialPort.Address;
 			rs = ffs(spcr->SerialPort.BitWidth) - 4;
+			/*
+			 * Workaround for QEMU and other platforms:
+			 * The SPCR table reports the bus BitWidth (e.g. 32),
+			 * but the actual 16550/ns8250 UART has 1-byte
+			 * register spacing. Force regshft to 0 for ns8250
+			 * family to match what the kernel does in
+			 * sys/dev/uart/uart_cpu_acpi.c.
+			 */
+			if (dt != NULL && strncmp(dt, "ns8250", 6) == 0)
+				rs = 0;
 			rw = acpi_uart_regionwidth(spcr->SerialPort.AccessWidth);
 		}
 	} else {

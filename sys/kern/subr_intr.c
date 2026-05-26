@@ -1908,6 +1908,10 @@ intr_ipi_send(cpuset_t cpus, u_int ipi)
 	if (ii->ii_count == NULL)
 		panic("%s: not setup IPI %u", __func__, ipi);
 
+	if (ipi == IPI_RENDEZVOUS || ipi == IPI_STOP || ipi == IPI_STOP_HARD)
+		printf("DEBUG: intr_ipi_send: ipi=%u, cpus=0x%lx\n",
+		    ipi, (unsigned long)cpus.__bits[0]);
+
 	/*
 	 * XXX: Surely needed on other architectures too? Either way should be
 	 * some kind of MI hook defined in an MD header, or the responsibility

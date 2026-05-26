@@ -47,11 +47,9 @@ static inline uint64_t
 counter_u64_fetch_inline(uint64_t *p)
 {
 	uint64_t r;
-	int i;
 
-	r = 0;
-	CPU_FOREACH(i)
-		r += counter_u64_read_one(p, i);
+	/* UP mode: only CPU 0 */
+	r = counter_u64_read_one(p, 0);
 
 	return (r);
 }
@@ -67,8 +65,8 @@ static inline void
 counter_u64_zero_inline(counter_u64_t c)
 {
 
-	smp_rendezvous(smp_no_rendezvous_barrier, counter_u64_zero_one_cpu,
-	    smp_no_rendezvous_barrier, c);
+	/* UP mode: only zero CPU 0 */
+	counter_u64_zero_one_cpu(c);
 }
 #endif
 

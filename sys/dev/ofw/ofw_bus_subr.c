@@ -365,7 +365,7 @@ ofw_bus_lookup_imap(phandle_t node, struct ofw_bus_iinfo *ii, void *reg,
 	if (node != -1) {
 		rv = OF_getencprop(node, "reg", reg, regsz);
 		if (rv < regsz)
-			panic("ofw_bus_lookup_imap: cannot get reg property");
+			return (0);
 	}
 	return (ofw_bus_search_intrmap(pintr, pintrsz, reg, ii->opi_addrc,
 	    ii->opi_imap, ii->opi_imapsz, ii->opi_imapmsk, maskbuf, mintr,

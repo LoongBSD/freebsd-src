@@ -43,6 +43,7 @@
 #include <sys/sched.h>
 #include <sys/smp.h>
 #include <sys/sysctl.h>
+#include <sys/kdb.h>
 
 #include <machine/cpu.h>
 #include <machine/pcb.h>
@@ -249,6 +250,9 @@ generic_stop_cpus(cpuset_t map, u_int type)
 	if (!smp_started)
 		return (0);
 
+	printf("DEBUG: CPU%d: stop_cpus(type=%u) ENTER, map=0x%lx\n",
+	    PCPU_GET(cpuid), type, (unsigned long)map.__bits[0]);
+
 	CTR2(KTR_SMP, "stop_cpus(%s) with %u type",
 	    cpusetobj_strprint(cpusetbuf, &map), type);
 
@@ -292,7 +296,10 @@ generic_stop_cpus(cpuset_t map, u_int type)
 		cpu_spinwait();
 		i++;
 		if (i == 100000000) {
-			printf("timeout stopping cpus\n");
+			printf("timeout stopping cpus (type=%u)\n", type);
+			printf("  map=0x%lx stopped_cpus=0x%lx\n",
+			    (unsigned long)map.__bits[0],
+			    (unsigned long)cpus->__bits[0]);
 			break;
 		}
 	}
@@ -303,6 +310,7 @@ generic_stop_cpus(cpuset_t map, u_int type)
 #endif
 
 	stopping_cpu = NOCPU;
+	printf("DEBUG: CPU%d: stop_cpus(type=%u) EXIT\n", PCPU_GET(cpuid), type);
 	return (1);
 }
 
@@ -454,9 +462,15 @@ smp_rendezvous_action(void)
 #endif
 
 	/* Ensure we have up-to-date values. */
+	printf("DEBUG: CPU%d: smp_rendezvous_action enter, waiters[0]=%d, ncpus=%d\n",
+	    curcpu, smp_rv_waiters[0], smp_rv_ncpus);
 	atomic_add_acq_int(&smp_rv_waiters[0], 1);
+	printf("DEBUG: CPU%d: incremented waiters[0] to %d\n",
+	    curcpu, smp_rv_waiters[0]);
 	while (smp_rv_waiters[0] < smp_rv_ncpus)
 		cpu_spinwait();
+
+	printf("DEBUG: CPU%d: passed first barrier\n", curcpu);
 
 	/* Fetch rendezvous parameters after acquire barrier. */
 	local_func_arg = smp_rv_func_arg;
@@ -498,15 +512,21 @@ smp_rendezvous_action(void)
 	 * function before moving on to the action function.
 	 */
 	if (local_setup_func != smp_no_rendezvous_barrier) {
-		if (local_setup_func != NULL)
+		if (local_setup_func != NULL) {
+			printf("DEBUG: CPU%d: smp_rendezvous_action calling setup=%p\n",
+			    PCPU_GET(cpuid), local_setup_func);
 			local_setup_func(local_func_arg);
+		}
 		atomic_add_int(&smp_rv_waiters[1], 1);
 		while (smp_rv_waiters[1] < smp_rv_ncpus)
                 	cpu_spinwait();
 	}
 
-	if (local_action_func != NULL)
+	if (local_action_func != NULL) {
+		printf("DEBUG: CPU%d: smp_rendezvous_action calling action=%p\n",
+		    PCPU_GET(cpuid), local_action_func);
 		local_action_func(local_func_arg);
+	}
 
 	if (local_teardown_func != smp_no_rendezvous_barrier) {
 		/*
@@ -566,6 +586,9 @@ smp_rendezvous_cpus(cpuset_t map,
 	 * Make sure we come here with interrupts enabled.  Otherwise we
 	 * livelock if smp_ipi_mtx is owned by a thread which sent us an IPI.
 	 */
+	printf("DEBUG: CPU%d: smp_rendezvous_cpus "
+	    "md_spinlock_count=%d (checking ==0)\n",
+	    curcpu, curthread->td_md.md_spinlock_count);
 	MPASS(curthread->td_md.md_spinlock_count == 0);
 
 	CPU_FOREACH(i) {
@@ -575,7 +598,19 @@ smp_rendezvous_cpus(cpuset_t map,
 	if (ncpus == 0)
 		panic("ncpus is 0 with non-zero map");
 
+	printf("DEBUG: CPU%d: smp_rendezvous_cpus enter, ncpus=%d, map=0x%lx\n",
+	    curcpu, ncpus, (unsigned long)map.__bits[0]);
+	printf("DEBUG: CPU%d: smp_ipi_mtx.mtx_lock=0x%lx\n",
+	    curcpu, (unsigned long)smp_ipi_mtx.mtx_lock);
+	if (curcpu != 0) {
+		printf("DEBUG: CPU%d: UNEXPECTED smp_rendezvous_cpus from AP, backtrace:\n",
+		    curcpu);
+		kdb_backtrace();
+	}
+
 	mtx_lock_spin(&smp_ipi_mtx);
+
+	printf("DEBUG: CPU%d: acquired smp_ipi_mtx\n", curcpu);
 
 	/* Pass rendezvous parameters via global variables. */
 	smp_rv_ncpus = ncpus;
@@ -588,17 +623,25 @@ smp_rendezvous_cpus(cpuset_t map,
 	smp_rv_waiters[3] = 0;
 	atomic_store_rel_int(&smp_rv_waiters[0], 0);
 
+	printf("DEBUG: CPU%d: rendezvous #0 set smp_rv_ncpus=%d, waiters[0]=0, "
+	    "setup=%p action=%p teardown=%p\n",
+	    curcpu, ncpus, setup_func, action_func, teardown_func);
+
 	/*
 	 * Signal other processors, which will enter the IPI with
 	 * interrupts off.
 	 */
 	curcpumap = CPU_ISSET(curcpu, &map);
 	CPU_CLR(curcpu, &map);
+	printf("DEBUG: CPU%d: rendezvous #0 curcpumap=%d, sending IPI to map=0x%lx\n",
+	    curcpu, curcpumap, (unsigned long)map.__bits[0]);
 	ipi_selected(map, IPI_RENDEZVOUS);
 
 	/* Check if the current CPU is in the map */
-	if (curcpumap != 0)
+	if (curcpumap != 0) {
+		printf("DEBUG: CPU%d: entering smp_rendezvous_action\n", curcpu);
 		smp_rendezvous_action();
+	}
 
 	/*
 	 * Ensure that the master CPU waits for all the other
@@ -611,9 +654,24 @@ smp_rendezvous_cpus(cpuset_t map,
 	 * all memory actions done by the called functions on other
 	 * CPUs.
 	 */
-	while (atomic_load_acq_int(&smp_rv_waiters[3]) < ncpus)
-		cpu_spinwait();
+	printf("DEBUG: CPU%d: waiting for all CPUs, waiters[3]=%d, ncpus=%d\n",
+	    curcpu, atomic_load_acq_int(&smp_rv_waiters[3]), ncpus);
+	{
+		int timeout = 0;
+		while (atomic_load_acq_int(&smp_rv_waiters[3]) < ncpus) {
+			cpu_spinwait();
+			if (++timeout > 100000000) {
+				printf("SMP rendezvous TIMEOUT: CPU%d waiters[0]=%d waiters[3]=%d ncpus=%d\n",
+				    curcpu, smp_rv_waiters[0],
+				    atomic_load_acq_int(&smp_rv_waiters[3]), ncpus);
+				printf("smp_ipi_mtx.mtx_lock=0x%lx\n",
+				    (unsigned long)smp_ipi_mtx.mtx_lock);
+				panic("smp_rendezvous_cpus timeout");
+			}
+		}
+	}
 
+	printf("DEBUG: CPU%d: rendezvous complete, releasing lock\n", curcpu);
 	mtx_unlock_spin(&smp_ipi_mtx);
 }
 

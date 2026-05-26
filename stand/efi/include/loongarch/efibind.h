@@ -50,7 +50,7 @@ Revision History
 #define BAD_POINTER         0xFBFBFBFBFBFBFBFB
 #define MAX_ADDRESS         0xFFFFFFFFFFFFFFFF
 
-#define BREAKPOINT()  __break(0)
+#define BREAKPOINT()  __asm__ volatile("break 0")
 
 //
 // Pointers must be aligned to these address to function
@@ -98,11 +98,10 @@ Revision History
 
 #define VOLATILE    volatile
 
-//
-// BugBug: Need to find out if this is portable across compilers.
-//
-void __mfa (void);
-#define MEMORY_FENCE()    __mfa()
+/*
+ * Memory barrier - LoongArch uses dbar (data barrier) instruction
+ */
+#define MEMORY_FENCE()  __asm__ volatile("dbar 0" ::: "memory")
 
 #ifdef EFI_NO_INTERFACE_DECL
   #define EFI_FORWARD_DECLARATION(x)

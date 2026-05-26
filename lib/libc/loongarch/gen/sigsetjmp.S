@@ -1,5 +1,7 @@
 /*-
  * Copyright (c) 2015 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -36,22 +38,23 @@
 #include <machine/setjmp.h>
 
 ENTRY(sigsetjmp)
-	beqz	a1, 1f
-	tail	_C_LABEL(setjmp)
+	beqz	$a1, 1f
+	b	_C_LABEL(setjmp)
 1:
-	tail	_C_LABEL(_setjmp)
+	b	_C_LABEL(_setjmp)
 END(sigsetjmp)
 
 ENTRY(siglongjmp)
 	/* Load the _setjmp magic */
-	ld	a2, .Lmagic
-	ld	a3, 0(a0)
+	la.local	$a2, .Lmagic
+	ld.d	$a2, $a2, 0
+	ld.d	$a3, $a0, 0
 
 	/* Check the magic */
-	beq	a2, a3, 1f
-	tail	_C_LABEL(longjmp)
+	beq	$a2, $a3, 1f
+	b	_C_LABEL(longjmp)
 1:
-	tail	_C_LABEL(_longjmp)
+	b	_C_LABEL(_longjmp)
 
 	.align	3
 .Lmagic:

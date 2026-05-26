@@ -1,5 +1,7 @@
 /*-
  * Copyright (c) 2015-2016 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -32,19 +34,34 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
 #include <sys/types.h>
 
 #include <fenv.h>
 #include <float.h>
+
+#ifdef __loongarch_soft_float
+#include "softfloat-for-gcc.h"
+#include "milieu.h"
+#include "softfloat.h"
+#endif
 
 int
 __flt_rounds(void)
 {
 	uint64_t mode;
 
-	__asm __volatile("csrr %0, fcsr" : "=r" (mode));
+#ifdef __loongarch_soft_float
+	mode = __softfloat_float_rounding_mode;
+#else
+#ifdef __clang__
+	__asm __volatile("movfcsr2gr %0,$fcsr0" : "=r" (mode));
+#else
+	__asm __volatile("movfcsr2gr %0,$r0" : "=r" (mode));
+#endif
+#endif
 
-	switch (mode & _ROUND_MASK) {
+	switch (mode & _FPU_RC_MASK) {
 	case FE_TOWARDZERO:
 		return (0);
 	case FE_TONEAREST:

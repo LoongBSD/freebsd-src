@@ -1,5 +1,8 @@
 /*-
  * Copyright (c) 1991 Regents of the University of California.
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
@@ -67,22 +70,33 @@ struct md_page {
 	vm_memattr_t		pv_memattr;
 };
 
-enum pmap_stage {
-	PM_INVALID,
-	PM_STAGE1,
-	PM_STAGE2,
+/*
+ * This structure is used to hold a virtual<->physical address
+ * association and is used mostly by bootstrap code
+ */
+struct pv_addr {
+	SLIST_ENTRY(pv_addr) pv_list;
+	vm_offset_t	pv_va;
+	vm_paddr_t	pv_pa;
 };
 
 struct pmap {
 	struct mtx		pm_mtx;
 	struct pmap_statistics	pm_stats;	/* pmap statictics */
 	pd_entry_t		*pm_top;	/* top-level page table page */
-	u_long			pm_satp;	/* value for SATP register */
+	u_long			pm_pgdl;	/* page global directory base address lower half*/
+	u_long			pm_pgdh;	/* page global directory base address higher half*/
 	cpuset_t		pm_active;	/* active on cpus */
 	TAILQ_HEAD(,pv_chunk)	pm_pvchunk;	/* list of mappings in pmap */
 	LIST_ENTRY(pmap)	pm_list;	/* List of all pmaps */
 	struct vm_radix		pm_root;
-	enum pmap_stage		pm_stage;
+	/* ASID management */
+	u_int			pm_asid[MAXCPU];	/* ASID for each CPU */
+	u_long			pm_asid_cookie;	/* ASID cookie (encoded ASID + generation) */
+	int			pm_pt_alloc;	/* debug: page table page allocs */
+	int			pm_pt_free;	/* debug: page table page frees */
+	int			pm_data_inc;	/* debug: data page resident inc */
+	int			pm_data_dec;	/* debug: data page resident dec */
 };
 
 typedef struct pmap *pmap_t;
@@ -115,17 +129,18 @@ extern vm_offset_t virtual_end;
 #define	L1_MAPPABLE_P(va, pa, size)					\
 	((((va) | (pa)) & L1_OFFSET) == 0 && (size) >= L1_SIZE)
 
-enum pmap_mode {
-	PMAP_MODE_SV39,
-	PMAP_MODE_SV48,
-};
-
-extern enum pmap_mode pmap_mode;
+/*
+ * LoongArch64 uses a 4-level page table structure (LA48) with 4KB pages.
+ * The page table levels are:
+ *   L0 (PGD) - 512 entries, each maps 512GB
+ *   L1 (PUD) - 512 entries, each maps 1GB
+ *   L2 (PMD) - 512 entries, each maps 2MB
+ *   L3 (PTE) - 512 entries, each maps 4KB
+ */
 
 /* Check if an address resides in a mappable region. */
 #define	VIRT_IS_VALID(va)						\
-	((va) < (pmap_mode == PMAP_MODE_SV39 ? VM_MAX_USER_ADDRESS_SV39 : \
-	    VM_MAX_USER_ADDRESS_SV48) || (va) >= VM_MIN_KERNEL_ADDRESS)
+	((va) < VM_MAX_USER_ADDRESS)
 
 struct thread;
 
@@ -133,7 +148,8 @@ struct thread;
 
 void	pmap_activate_boot(pmap_t);
 void	pmap_activate_sw(struct thread *);
-void	pmap_bootstrap(vm_paddr_t, vm_size_t);
+struct pcb *pmap_switch(struct thread *);
+void	pmap_bootstrap(vm_offset_t, vm_paddr_t, vm_size_t);
 int	pmap_change_attr(vm_offset_t va, vm_size_t size, int mode);
 void	pmap_kenter(vm_offset_t sva, vm_size_t size, vm_paddr_t pa, int mode);
 void	pmap_kenter_device(vm_offset_t, vm_size_t, vm_paddr_t);
@@ -141,7 +157,6 @@ vm_paddr_t pmap_kextract(vm_offset_t va);
 void	pmap_kremove(vm_offset_t);
 void	pmap_kremove_device(vm_offset_t, vm_size_t);
 void	*pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma);
-int	pmap_pinit_stage(pmap_t, enum pmap_stage);
 bool	pmap_page_is_mapped(vm_page_t m);
 bool	pmap_ps_enabled(pmap_t);
 
@@ -149,6 +164,8 @@ void	*pmap_mapdev(vm_paddr_t, vm_size_t);
 void	*pmap_mapbios(vm_paddr_t, vm_size_t);
 void	pmap_unmapdev(void *, vm_size_t);
 void	pmap_unmapbios(void *, vm_size_t);
+void	pmap_preboot_map_attr(vm_paddr_t pa, vm_offset_t va, vm_size_t size,
+    vm_prot_t prot, vm_memattr_t attr);
 
 bool	pmap_map_io_transient(vm_page_t *, vm_offset_t *, int, bool);
 void	pmap_unmap_io_transient(vm_page_t *, vm_offset_t *, int, bool);
@@ -157,6 +174,18 @@ bool	pmap_get_tables(pmap_t, vm_offset_t, pd_entry_t **, pd_entry_t **,
     pt_entry_t **);
 
 int	pmap_fault(pmap_t, vm_offset_t, vm_prot_t);
+
+/*
+ * PTW diagnostic functions (non-intrusive, for debugging only)
+ * These functions only read and print state, they do NOT modify any behavior
+ */
+void	pmap_print_pwctl_config(void);
+void	pmap_ptw_diagnose_kernel(void);
+void	pmap_walk_pt_va(vm_offset_t va);
+void	pmap_diagnose_l0_table(void);
+void	pmap_diagnose_l1_table(vm_offset_t va_base);
+void	pmap_diagnose_l2_table(vm_offset_t va_base);
+void	pmap_full_diagnose(void);
 
 static inline int
 pmap_vmspace_copy(pmap_t dst_pmap __unused, pmap_t src_pmap __unused)

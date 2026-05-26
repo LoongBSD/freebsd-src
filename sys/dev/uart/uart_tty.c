@@ -85,11 +85,14 @@ uart_cnprobe(struct consdev *cp)
 
 	KASSERT(uart_console.cookie == NULL, ("foo"));
 
+	*(volatile uint8_t *)0x800000001FE001E0UL = 'x';
 	if (uart_cpu_getdev(UART_DEV_CONSOLE, &uart_console))
 		return;
+	*(volatile uint8_t *)0x800000001FE001E0UL = 'y';
 
 	if (uart_probe(&uart_console))
 		return;
+	*(volatile uint8_t *)0x800000001FE001E0UL = 'z';
 
 	strlcpy(cp->cn_name, uart_driver_name, sizeof(cp->cn_name));
 	cp->cn_pri = (boothowto & RB_SERIAL) ? CN_REMOTE : CN_NORMAL;

@@ -374,7 +374,7 @@ _ILINKS+= i386
 
 .if ${MK_REPRODUCIBLE_BUILD} != "no"
 PREFIX_SYSDIR=/usr/src/sys
-PREFIX_OBJDIR=/usr/obj/usr/src/${MACHINE}.${MACHINE_CPUARCH}/sys/${KERN_IDENT}
+PREFIX_OBJDIR=/usr/obj/usr/src/${MACHINE}.${MACHINE_ARCH}/sys/${KERN_IDENT}
 CFLAGS+= -ffile-prefix-map=${SYSDIR}=${PREFIX_SYSDIR}
 CFLAGS+= -ffile-prefix-map=${.OBJDIR}=${PREFIX_OBJDIR}
 .if defined(SYSROOT)

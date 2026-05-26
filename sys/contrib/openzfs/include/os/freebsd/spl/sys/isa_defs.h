@@ -150,6 +150,15 @@ extern "C" {
 #endif
 #define	_SUNOS_VTOC_16
 
+#elif defined(__loongarch__)
+/*
+ * LoongArch 64-bit architecture
+ */
+#if !defined(_LP64)
+#define	_LP64
+#endif
+#define	_SUNOS_VTOC_16
+
 #elif defined(__riscv)
 
 /*

@@ -1,5 +1,8 @@
 /*-
  * Copyright (c) 2015-2016 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -38,132 +41,132 @@
 static __inline void
 breakpoint(void)
 {
-
-	__asm("ebreak");
+	__asm __volatile__("break 0");
 }
 
 #ifdef _KERNEL
 
+#include <machine/loongarchreg.h>
 #include <sys/_null.h>
-
-#include <machine/riscvreg.h>
 
 static __inline register_t
 intr_disable(void)
 {
-	uint64_t ret;
+  uint32_t flags = 0;
+  __asm__ __volatile__(
+    "csrxchg %[val], %[mask], %[reg]\n\t"
+    : [val] "+r" (flags)
+    : [mask] "r" (CSR_CRMD_IE), [reg] "i" (LOONGARCH_CSR_CRMD)
+    : "memory");
 
-	__asm __volatile(
-		"csrrci %0, sstatus, %1"
-		: "=&r" (ret) : "i" (SSTATUS_SIE)
-	);
-
-	return (ret & (SSTATUS_SIE));
+	return (flags & (CSR_CRMD_IE));
 }
 
 static __inline void
 intr_restore(register_t s)
 {
+  uint32_t flags = s;
 
-	__asm __volatile(
-		"csrs sstatus, %0"
-		:: "r" (s)
-	);
+  __asm__ __volatile__(
+    "csrxchg %[val], %[mask], %[reg]\n\t"
+    : [val] "+r" (flags)
+    : [mask] "r" (CSR_CRMD_IE), [reg] "i" (LOONGARCH_CSR_CRMD)
+    : "memory");
 }
 
 static __inline void
 intr_enable(void)
 {
-
-	__asm __volatile(
-		"csrsi sstatus, %0"
-		:: "i" (SSTATUS_SIE)
-	);
-}
-
-/* NB: fence() is defined as a macro in <machine/atomic.h>. */
-
-static __inline void
-fence_i(void)
-{
-
-	__asm __volatile("fence.i" ::: "memory");
+  intr_restore(CSR_CRMD_IE);
 }
 
 static __inline void
-sfence_vma(void)
+flush_icache(void)
 {
-
-	__asm __volatile("sfence.vma" ::: "memory");
+	__asm __volatile("ibar 0" ::);
 }
 
-static __inline void
-sfence_vma_page(uintptr_t addr)
+static inline unsigned long rdtime(void)
 {
+  unsigned long val = 0;
 
-	__asm __volatile("sfence.vma %0" :: "r" (addr) : "memory");
+  __asm __volatile(
+    "rdtime.d %0, $zero\n\t"
+    : "=r"(val)
+    :
+    );
+  return val;
 }
 
-static __inline void
-sfence_vma_asid(uint64_t asid)
-{
-
-	__asm __volatile("sfence.vma x0, %0" :: "r" (asid) : "memory");
-}
-
-static __inline void
-sfence_vma_asid_page(uint64_t asid, uintptr_t addr)
-{
-
-	__asm __volatile("sfence.vma %0, %1" :: "r" (addr), "r" (asid)
-	    : "memory");
-}
-
-#define	rdcycle()			csr_read64(cycle)
-#define	rdtime()			csr_read64(time)
-#define	rdinstret()			csr_read64(instret)
-#define	rdhpmcounter(n)			csr_read64(hpmcounter##n)
-
-/* Cache hooks. */
+#define	rdcycle()			rdtime()
 
 extern int64_t dcache_line_size;
+extern int64_t icache_line_size;
 
-typedef void (*cache_op_t)(vm_offset_t start, vm_size_t size);
-
-struct riscv_cache_ops {
-	cache_op_t dcache_wbinv_range;
-	cache_op_t dcache_inv_range;
-	cache_op_t dcache_wb_range;
+struct loongarch_cache_ops {
+	void	(*dcache_wbinv_range)(vm_offset_t, vm_size_t);
+	void	(*dcache_inv_range)(vm_offset_t, vm_size_t);
+	void	(*dcache_wb_range)(vm_offset_t, vm_size_t);
+	void	(*icache_sync_range)(vm_offset_t, vm_size_t);
+	void	(*icache_sync_range_checked)(vm_offset_t, vm_size_t);
+	void	(*idcache_wbinv_range)(vm_offset_t, vm_size_t);
 };
 
-extern struct riscv_cache_ops cache_ops;
+extern struct loongarch_cache_ops cache_ops;
+
+void loongarch_cache_install_hooks(struct loongarch_cache_ops *, u_int);
 
 static __inline void
-cpu_dcache_wbinv_range(vm_offset_t addr, vm_size_t size)
+cpu_dcache_wbinv_range(vm_offset_t va, vm_size_t size)
 {
+
 	if (cache_ops.dcache_wbinv_range != NULL)
-		cache_ops.dcache_wbinv_range(addr, size);
+		cache_ops.dcache_wbinv_range(va, size);
 }
 
 static __inline void
-cpu_dcache_inv_range(vm_offset_t addr, vm_size_t size)
+cpu_dcache_inv_range(vm_offset_t va, vm_size_t size)
 {
+
 	if (cache_ops.dcache_inv_range != NULL)
-		cache_ops.dcache_inv_range(addr, size);
+		cache_ops.dcache_inv_range(va, size);
 }
 
 static __inline void
-cpu_dcache_wb_range(vm_offset_t addr, vm_size_t size)
+cpu_dcache_wb_range(vm_offset_t va, vm_size_t size)
 {
+
 	if (cache_ops.dcache_wb_range != NULL)
-		cache_ops.dcache_wb_range(addr, size);
+		cache_ops.dcache_wb_range(va, size);
 }
 
-void riscv_cache_install_hooks(struct riscv_cache_ops *, u_int);
+static __inline void
+cpu_idcache_wbinv_range(vm_offset_t va, vm_size_t size)
+{
 
-#define	cpufunc_nullop()		riscv_nullop()
+	if (cache_ops.idcache_wbinv_range != NULL)
+		cache_ops.idcache_wbinv_range(va, size);
+}
 
-void riscv_nullop(void);
+static __inline void
+cpu_icache_sync_range(vm_offset_t va, vm_size_t size)
+{
+
+	if (cache_ops.icache_sync_range != NULL)
+		cache_ops.icache_sync_range(va, size);
+}
+
+static __inline void
+cpu_icache_sync_range_checked(vm_offset_t va, vm_size_t size)
+{
+
+	if (cache_ops.icache_sync_range_checked != NULL)
+		cache_ops.icache_sync_range_checked(va, size);
+}
+
+#define	cpufunc_nullop()		loongarch_nullop()
+
+void loongarch_nullop(void);
 
 #endif	/* _KERNEL */
 #endif	/* _MACHINE_CPUFUNC_H_ */

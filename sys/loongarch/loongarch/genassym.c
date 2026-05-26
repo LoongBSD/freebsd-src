@@ -1,5 +1,8 @@
 /*-
  * Copyright (c) 2015-2016 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -32,45 +35,55 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/assym.h>
 #include <sys/proc.h>
 #include <sys/mbuf.h>
 #include <sys/vmmeter.h>
+#include <sys/bus.h>
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 
-#include <machine/riscvreg.h>
+#include <machine/loongarchreg.h>
 #include <machine/frame.h>
 #include <machine/pcb.h>
+#include <machine/trap.h>
 #include <machine/cpu.h>
 #include <machine/proc.h>
 #include <machine/cpufunc.h>
 #include <machine/pte.h>
+#include <machine/intr.h>
 #include <machine/machdep.h>
 #include <machine/vmparam.h>
-
-#include <riscv/vmm/riscv.h>
 
 ASSYM(KERNBASE, KERNBASE);
 ASSYM(VM_MAXUSER_ADDRESS, VM_MAXUSER_ADDRESS);
 ASSYM(VM_MAX_KERNEL_ADDRESS, VM_MAX_KERNEL_ADDRESS);
+ASSYM(VM_EARLY_DTB_ADDRESS, VM_EARLY_DTB_ADDRESS);
 ASSYM(PMAP_MAPDEV_EARLY_SIZE, PMAP_MAPDEV_EARLY_SIZE);
-
-ASSYM(PM_SATP, offsetof(struct pmap, pm_satp));
 
 ASSYM(PCB_ONFAULT, offsetof(struct pcb, pcb_onfault));
 ASSYM(PCB_SIZE, sizeof(struct pcb));
-ASSYM(PCB_RA, offsetof(struct pcb, pcb_ra));
-ASSYM(PCB_SP, offsetof(struct pcb, pcb_sp));
-ASSYM(PCB_GP, offsetof(struct pcb, pcb_gp));
-ASSYM(PCB_TP, offsetof(struct pcb, pcb_tp));
-ASSYM(PCB_S, offsetof(struct pcb, pcb_s));
-ASSYM(PCB_X, offsetof(struct pcb, pcb_x));
-ASSYM(PCB_FCSR, offsetof(struct pcb, pcb_fcsr));
+ASSYM(PCB_ERA, offsetof(struct pcb, pcb_era));
+ASSYM(PCB_A0, offsetof(struct pcb, pcb_a0));
+ASSYM(PCB_EUEN, offsetof(struct pcb, pcb_euen));
+ASSYM(PCB_CRMD, offsetof(struct pcb, pcb_crmd));
+ASSYM(PCB_PRMD, offsetof(struct pcb, pcb_prmd));
+ASSYM(PCB_ECFG, offsetof(struct pcb, pcb_ecfg));
+ASSYM(PCB_ESTAT, offsetof(struct pcb, pcb_estat));
+ASSYM(PCB_FCSR, offsetof(struct pcb, uf.pcb_fcsr0));
+ASSYM(PCB_S, offsetof(struct pcb, pcb_regs[23]));
+ASSYM(PCB_RA, offsetof(struct pcb, pcb_regs[1]));
+ASSYM(PCB_SP, offsetof(struct pcb, pcb_regs[3]));
+ASSYM(PCB_TP, offsetof(struct pcb, pcb_regs[2]));
+ASSYM(PCB_FP, offsetof(struct pcb, pcb_regs[22]));
+ASSYM(PCB_F, offsetof(struct pcb, pcb_fregs));
+ASSYM(PCB_FPFLAGS, offsetof(struct pcb, pcb_fpflags));
+ASSYM(RSIZE, RSIZE);
 
 ASSYM(SF_UC, offsetof(struct sigframe, sf_uc));
 
@@ -85,56 +98,63 @@ ASSYM(TD_FRAME, offsetof(struct thread, td_frame));
 ASSYM(TD_MD, offsetof(struct thread, td_md));
 ASSYM(TD_LOCK, offsetof(struct thread, td_lock));
 
-ASSYM(TF_SIZE, TF_SIZE);
-ASSYM(TF_RA, offsetof(struct trapframe, tf_ra));
-ASSYM(TF_SP, offsetof(struct trapframe, tf_sp));
-ASSYM(TF_GP, offsetof(struct trapframe, tf_gp));
-ASSYM(TF_TP, offsetof(struct trapframe, tf_tp));
-ASSYM(TF_T, offsetof(struct trapframe, tf_t));
-ASSYM(TF_S, offsetof(struct trapframe, tf_s));
-ASSYM(TF_A, offsetof(struct trapframe, tf_a));
-ASSYM(TF_SEPC, offsetof(struct trapframe, tf_sepc));
-ASSYM(TF_STVAL, offsetof(struct trapframe, tf_stval));
-ASSYM(TF_SCAUSE, offsetof(struct trapframe, tf_scause));
-ASSYM(TF_SSTATUS, offsetof(struct trapframe, tf_sstatus));
+ASSYM(TF_SIZE, roundup2(sizeof(struct trapframe), STACKALIGNBYTES + 1));
+ASSYM(TF_REGS, offsetof(struct trapframe, tf_regs));
+ASSYM(TF_R0, offsetof(struct trapframe, tf_regs[0]));
+ASSYM(TF_R1, offsetof(struct trapframe, tf_regs[1]));
+ASSYM(TF_R2, offsetof(struct trapframe, tf_regs[2]));
+ASSYM(TF_R3, offsetof(struct trapframe, tf_regs[3]));
+ASSYM(TF_R4, offsetof(struct trapframe, tf_regs[4]));
+ASSYM(TF_R5, offsetof(struct trapframe, tf_regs[5]));
+ASSYM(TF_R6, offsetof(struct trapframe, tf_regs[6]));
+ASSYM(TF_R7, offsetof(struct trapframe, tf_regs[7]));
+ASSYM(TF_R8, offsetof(struct trapframe, tf_regs[8]));
+ASSYM(TF_R9, offsetof(struct trapframe, tf_regs[9]));
+ASSYM(TF_R10, offsetof(struct trapframe, tf_regs[10]));
+ASSYM(TF_R11, offsetof(struct trapframe, tf_regs[11]));
+ASSYM(TF_R12, offsetof(struct trapframe, tf_regs[12]));
+ASSYM(TF_R13, offsetof(struct trapframe, tf_regs[13]));
+ASSYM(TF_R14, offsetof(struct trapframe, tf_regs[14]));
+ASSYM(TF_R15, offsetof(struct trapframe, tf_regs[15]));
+ASSYM(TF_R16, offsetof(struct trapframe, tf_regs[16]));
+ASSYM(TF_R17, offsetof(struct trapframe, tf_regs[17]));
+ASSYM(TF_R18, offsetof(struct trapframe, tf_regs[18]));
+ASSYM(TF_R19, offsetof(struct trapframe, tf_regs[19]));
+ASSYM(TF_R20, offsetof(struct trapframe, tf_regs[20]));
+ASSYM(TF_R21, offsetof(struct trapframe, tf_regs[21]));
+ASSYM(TF_R22, offsetof(struct trapframe, tf_regs[22]));
+ASSYM(TF_R23, offsetof(struct trapframe, tf_regs[23]));
+ASSYM(TF_R24, offsetof(struct trapframe, tf_regs[24]));
+ASSYM(TF_R25, offsetof(struct trapframe, tf_regs[25]));
+ASSYM(TF_R26, offsetof(struct trapframe, tf_regs[26]));
+ASSYM(TF_R27, offsetof(struct trapframe, tf_regs[27]));
+ASSYM(TF_R28, offsetof(struct trapframe, tf_regs[28]));
+ASSYM(TF_R29, offsetof(struct trapframe, tf_regs[29]));
+ASSYM(TF_R30, offsetof(struct trapframe, tf_regs[30]));
+ASSYM(TF_R31, offsetof(struct trapframe, tf_regs[31]));
 
-ASSYM(KF_TP, offsetof(struct kernframe, kf_tp));
+ASSYM(TF_A, offsetof(struct trapframe, tf_regs[4]));
+ASSYM(TF_T, offsetof(struct trapframe, tf_regs[12]));
+ASSYM(TF_S, offsetof(struct trapframe, tf_regs[23]));
+ASSYM(TF_RA, offsetof(struct trapframe, tf_regs[1]));
+ASSYM(TF_TP, offsetof(struct trapframe, tf_regs[2]));
+ASSYM(TF_SP, offsetof(struct trapframe, tf_regs[3]));
 
-ASSYM(HYP_H_RA, offsetof(struct hypctx, host_regs.hyp_ra));
-ASSYM(HYP_H_SP, offsetof(struct hypctx, host_regs.hyp_sp));
-ASSYM(HYP_H_GP, offsetof(struct hypctx, host_regs.hyp_gp));
-ASSYM(HYP_H_TP, offsetof(struct hypctx, host_regs.hyp_tp));
-ASSYM(HYP_H_T, offsetof(struct hypctx, host_regs.hyp_t));
-ASSYM(HYP_H_S, offsetof(struct hypctx, host_regs.hyp_s));
-ASSYM(HYP_H_A, offsetof(struct hypctx, host_regs.hyp_a));
-ASSYM(HYP_H_SEPC, offsetof(struct hypctx, host_regs.hyp_sepc));
-ASSYM(HYP_H_SSTATUS, offsetof(struct hypctx, host_regs.hyp_sstatus));
-ASSYM(HYP_H_HSTATUS, offsetof(struct hypctx, host_regs.hyp_hstatus));
-ASSYM(HYP_H_SSCRATCH, offsetof(struct hypctx, host_sscratch));
-ASSYM(HYP_H_STVEC, offsetof(struct hypctx, host_stvec));
-ASSYM(HYP_H_SCOUNTEREN, offsetof(struct hypctx, host_scounteren));
+ASSYM(TF_A0, offsetof(struct trapframe, tf_regs[4]));
+ASSYM(TF_ERA, offsetof(struct trapframe, tf_era));
+ASSYM(TF_BADVADDR, offsetof(struct trapframe, tf_badvaddr));
+ASSYM(TF_CRMD, offsetof(struct trapframe, tf_crmd));
+ASSYM(TF_PRMD, offsetof(struct trapframe, tf_prmd));
+ASSYM(TF_EUEN, offsetof(struct trapframe, tf_euen));
+ASSYM(TF_MISC, offsetof(struct trapframe, tf_misc));
+ASSYM(TF_ECFG, offsetof(struct trapframe, tf_ecfg));
+ASSYM(TF_ESTAT, offsetof(struct trapframe, tf_estat));
 
-ASSYM(HYP_G_RA, offsetof(struct hypctx, guest_regs.hyp_ra));
-ASSYM(HYP_G_SP, offsetof(struct hypctx, guest_regs.hyp_sp));
-ASSYM(HYP_G_GP, offsetof(struct hypctx, guest_regs.hyp_gp));
-ASSYM(HYP_G_TP, offsetof(struct hypctx, guest_regs.hyp_tp));
-ASSYM(HYP_G_T, offsetof(struct hypctx, guest_regs.hyp_t));
-ASSYM(HYP_G_S, offsetof(struct hypctx, guest_regs.hyp_s));
-ASSYM(HYP_G_A, offsetof(struct hypctx, guest_regs.hyp_a));
-ASSYM(HYP_G_SEPC, offsetof(struct hypctx, guest_regs.hyp_sepc));
-ASSYM(HYP_G_SSTATUS, offsetof(struct hypctx, guest_regs.hyp_sstatus));
-ASSYM(HYP_G_HSTATUS, offsetof(struct hypctx, guest_regs.hyp_hstatus));
-ASSYM(HYP_G_SCOUNTEREN, offsetof(struct hypctx, guest_scounteren));
-
-ASSYM(HYP_TRAP_SEPC, offsetof(struct hyptrap, sepc));
-ASSYM(HYP_TRAP_SCAUSE, offsetof(struct hyptrap, scause));
-ASSYM(HYP_TRAP_STVAL, offsetof(struct hyptrap, stval));
-ASSYM(HYP_TRAP_HTVAL, offsetof(struct hyptrap, htval));
-ASSYM(HYP_TRAP_HTINST, offsetof(struct hyptrap, htinst));
-
-ASSYM(RISCV_BOOTPARAMS_SIZE, sizeof(struct riscv_bootparams));
-ASSYM(RISCV_BOOTPARAMS_KERN_PHYS, offsetof(struct riscv_bootparams, kern_phys));
-ASSYM(RISCV_BOOTPARAMS_KERN_STACK, offsetof(struct riscv_bootparams,
+ASSYM(LOONGARCH_BOOTPARAMS_SIZE, sizeof(struct loongarch_bootparams));
+ASSYM(LOONGARCH_BOOTPARAMS_KERN_L1PT, offsetof(struct loongarch_bootparams, kern_l1pt));
+ASSYM(LOONGARCH_BOOTPARAMS_KERN_PHYS, offsetof(struct loongarch_bootparams, kern_phys));
+ASSYM(LOONGARCH_BOOTPARAMS_KERN_STACK, offsetof(struct loongarch_bootparams,
     kern_stack));
-ASSYM(RISCV_BOOTPARAMS_DTBP_PHYS, offsetof(struct riscv_bootparams, dtbp_phys));
-ASSYM(RISCV_BOOTPARAMS_MODULEP, offsetof(struct riscv_bootparams, modulep));
+ASSYM(LOONGARCH_BOOTPARAMS_DTBP_VIRT, offsetof(struct loongarch_bootparams, dtbp_virt));
+ASSYM(LOONGARCH_BOOTPARAMS_DTBP_PHYS, offsetof(struct loongarch_bootparams, dtbp_phys));
+ASSYM(LOONGARCH_BOOTPARAMS_MODULEP, offsetof(struct loongarch_bootparams, modulep));

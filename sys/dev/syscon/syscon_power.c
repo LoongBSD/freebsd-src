@@ -98,22 +98,32 @@ static int
 syscon_power_attach(device_t dev)
 {
 	struct syscon_power_softc *sc;
-	phandle_t node;
+	phandle_t node, parent;
 	int error, len;
 	bool has_mask;
 
 	sc = device_get_softc(dev);
 	node = ofw_bus_get_node(dev);
 
-	if (!OF_hasprop(node, "regmap")) {
-		device_printf(dev, "could not find regmap\n");
-		return (ENXIO);
-	}
+	if (OF_hasprop(node, "regmap")) {
+		error = syscon_get_by_ofw_property(dev, node, "regmap", &sc->regmap);
+		if (error != 0) {
+			device_printf(dev, "could not get syscon\n");
+			return (ENXIO);
+		}
+	} else {
+		/* Try to get syscon from parent node */
+		parent = OF_parent(node);
+		if (parent == 0) {
+			device_printf(dev, "could not find parent node\n");
+			return (ENXIO);
+		}
 
-	error = syscon_get_by_ofw_property(dev, node, "regmap", &sc->regmap);
-	if (error != 0) {
-		device_printf(dev, "could not get syscon\n");
-		return (ENXIO);
+		error = syscon_get_by_ofw_node(dev, parent, &sc->regmap);
+		if (error != 0) {
+			device_printf(dev, "could not get syscon from parent\n");
+			return (ENXIO);
+		}
 	}
 
 	len = OF_getproplen(node, "offset");

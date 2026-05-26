@@ -1,5 +1,8 @@
 /*-
  * Copyright (c) 2015-2016 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -39,19 +42,82 @@
 
 struct trapframe;
 
+/*
+ * PCB (Process Control Block) structure for LoongArch.
+ *
+ * This structure stores the saved context of a thread when it is not running.
+ * It includes:
+ * - General-purpose registers (GPRs)
+ * - Control and status registers (CSRs)
+ * - Floating-point registers (FPRs) and FCSR
+ */
 struct pcb {
-	uint64_t	pcb_ra;		/* Return address */
-	uint64_t	pcb_sp;		/* Stack pointer */
-	uint64_t	pcb_gp;		/* Global pointer */
-	uint64_t	pcb_tp;		/* Thread pointer */
-	uint64_t	pcb_s[12];	/* Saved registers */
-	uint64_t	pcb_x[32][2];	/* Floating point registers */
-	uint64_t	pcb_fcsr;	/* Floating point control reg */
-	uint64_t	pcb_fpflags;	/* Floating point flags */
-#define	PCB_FP_STARTED	0x1
-#define	PCB_FP_USERMASK	0x1
-	vm_offset_t	pcb_onfault;	/* Copyinout fault handler */
+	/*
+	 * Frequently accessed fields must be placed at the beginning
+	 * to ensure they are within the immediate range of ld.d/st.d [-2048, 2047].
+	 * This is critical for assembly code in copyinout.S and swtch.S.
+	 */
+
+	/* Copyinout fault handler - MUST be at small offset! */
+	vm_offset_t	pcb_onfault;
+
+	/* PCB flags */
+	uint64_t	pcb_a0;
+	uint64_t	pcb_fpflags;
+#define	PCB_FP_STARTED		0x0001	/* FPU context has been used */
+#define	PCB_FP_USERMASK		0x0001	/* FPU used by user mode */
+#define	PCB_FP_KERN		0x0002	/* FPU used by kernel mode */
+#define	PCB_FP_NOSAVE		0x0004	/* Don't save FPU on ctx switch */
+
+	/* General-purpose registers (32 x 8 bytes = 256 bytes) */
+	union {
+		uint64_t	pcb_regs[32];
+		struct {
+			uint64_t r0;
+			uint64_t ra;
+			uint64_t tp;
+			uint64_t sp;
+			uint64_t a[8];
+			uint64_t t[9];
+			uint64_t r21;
+			uint64_t fp;
+			uint64_t s[9];
+		} u;
+	};
+#define pcb_a u.a
+#define pcb_t u.t
+#define pcb_s u.s
+#define pcb_ra u.ra
+#define pcb_sp u.sp
+#define pcb_tp u.tp
+#define pcb_fp u.fp
+
+	/* Control and status registers (7 x 8 bytes = 56 bytes) */
+	uint64_t	pcb_crmd;
+	uint64_t	pcb_prmd;
+	uint64_t	pcb_euen;
+	uint64_t	pcb_misc;
+	uint64_t	pcb_ecfg;
+	uint64_t	pcb_estat;
+	uint64_t	pcb_era;
+	uint64_t	pcb_badvaddr;
+
+	/* Floating-point registers (34 x 8 bytes = 272 bytes) */
+	union {
+		uint64_t	pcb_fregs[34];
+		struct {
+			uint64_t fa[8];
+			uint64_t ft[16];
+			uint64_t fs[8];
+			uint64_t pcb_fcsr0;
+		} uf;
+	};
 };
+
+/*
+ * PCB total size: approximately 1,104 bytes
+ */
+#define	PCB_SIZE	(sizeof(struct pcb))
 
 #ifdef _KERNEL
 void	makectx(struct trapframe *tf, struct pcb *pcb);

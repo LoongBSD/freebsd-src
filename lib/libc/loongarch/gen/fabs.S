@@ -1,6 +1,8 @@
 /*-
  * Copyright (c) 2015-2017 Ruslan Bukin <br@bsdpad.com>
  * Copyright (c) 2021 Alex Richardson <arichardson@FreeBSD.org>
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -38,11 +40,11 @@
 
 #include <machine/asm.h>
 ENTRY(fabs)
-#ifdef __riscv_float_abi_double
-	fabs.d	fa0, fa0
+#ifdef __loongarch_double_float
+	fabs.d	$fa0, $fa0
 #else
-	slli	a0, a0, 1
-	srli	a0, a0, 1
+	slli.d	$a0, $a0, 1
+	srli.d	$a0, $a0, 1
 #endif
-	ret
+	jr	$ra
 END(fabs)

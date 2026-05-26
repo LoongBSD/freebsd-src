@@ -1,5 +1,7 @@
 /*-
  * Copyright (c) 2015 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -34,15 +36,15 @@
 
 #include <machine/asm.h>
 ENTRY(cerror)
-	addi	sp, sp, -16
-	sd	a0, 0(sp)
-	sd	ra, 8(sp)
-	call	_C_LABEL(__error)
-	ld	a1, 0(sp)
-	ld	ra, 8(sp)
-	sw	a1, 0(a0)
-	li	a0, -1
-	li	a1, -1
-	addi	sp, sp, 16
-	ret
+	addi.d	$sp, $sp, -16
+	st.d	$a0, $sp, 0
+	st.d	$ra, $sp, 8
+	bl	_C_LABEL(__error)
+	ld.d	$a1, $sp, 0
+	ld.d	$ra, $sp, 8
+	st.w	$a1, $a0, 0
+	li.d	$a0, -1
+	li.d	$a1, -1
+	addi.d	$sp, $sp, 16
+	jr	$ra
 END(cerror)

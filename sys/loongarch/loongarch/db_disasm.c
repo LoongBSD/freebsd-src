@@ -1,5 +1,7 @@
 /*-
  * Copyright (c) 2016-2018 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -32,569 +34,632 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <ddb/ddb.h>
 #include <ddb/db_access.h>
 #include <ddb/db_sym.h>
 
-#include <machine/encoding.h>
+/*
+ * LoongArch instruction encoding bits and masks.
+ */
+#define	OPCODE_SHIFT	26
+#define	OPCODE_MASK	(0x3f << OPCODE_SHIFT)
 
-#define	X_RA	1
-#define	X_SP	2
-#define	X_GP	3
-#define	X_TP	4
-#define	X_T0	5
-#define	X_T1	6
-#define	X_T2	7
-#define	X_T3	28
-
-#define	RD_SHIFT	7
+#define	RD_SHIFT	0
 #define	RD_MASK		(0x1f << RD_SHIFT)
-#define	RS1_SHIFT	15
-#define	RS1_MASK	(0x1f << RS1_SHIFT)
-#define	RS2_SHIFT	20
-#define	RS2_MASK	(0x1f << RS2_SHIFT)
-#define	IMM_SHIFT	20
-#define	IMM_MASK	(0xfff << IMM_SHIFT)
+#define	RJ_SHIFT	5
+#define	RJ_MASK		(0x1f << RJ_SHIFT)
+#define	RK_SHIFT	10
+#define	RK_MASK		(0x1f << RK_SHIFT)
+#define	RA_SHIFT	15
+#define	RA_MASK		(0x1f << RA_SHIFT)
+#define	FD_SHIFT	0
+#define	FD_MASK		(0x1f << FD_SHIFT)
+#define	FJ_SHIFT	5
+#define	FJ_MASK		(0x1f << FJ_SHIFT)
+#define	FK_SHIFT	10
+#define	FK_MASK		(0x1f << FK_SHIFT)
+#define	FA_SHIFT	15
+#define	FA_MASK		(0x1f << FA_SHIFT)
 
-static char *reg_name[32] = {
-	"zero",	"ra",	"sp",	"gp",	"tp",	"t0",	"t1",	"t2",
-	"s0",	"s1",	"a0",	"a1",	"a2",	"a3",	"a4",	"a5",
-	"a6",	"a7",	"s2",	"s3",	"s4",	"s5",	"s6",	"s7",
-	"s8",	"s9",	"s10",	"s11",	"t3",	"t4",	"t5",	"t6"
+#define	IMM5_SHIFT	10
+#define	IMM5_MASK	(0x1f << IMM5_SHIFT)
+#define	IMM6_SHIFT	10
+#define	IMM6_MASK	(0x3f << IMM6_SHIFT)
+#define	IMM12_SHIFT	10
+#define	IMM12_MASK	(0xfff << IMM12_SHIFT)
+#define	IMM14_SHIFT	10
+#define	IMM14_MASK	(0x3fff << IMM14_SHIFT)
+#define	IMM16_SHIFT	10
+#define	IMM16_MASK	(0xffff << IMM16_SHIFT)
+#define	IMM20_SHIFT	5
+#define	IMM20_MASK	(0xfffff << IMM20_SHIFT)
+#define	IMM21_SHIFT	0
+#define	IMM21_MASK	(0x1fffff << IMM21_SHIFT)
+#define	IMM25_SHIFT	0
+#define	IMM25_MASK	(0x1ffffff << IMM25_SHIFT)
+#define	IMM26_SHIFT	0
+#define	IMM26_MASK	(0x3ffffff << IMM26_SHIFT)
+
+#define	OPCODE_1RI20	0x0a	/* lu12i.w, lu32i.d */
+#define	OPCODE_1RI21	0x02	/* b, bl */
+#define	OPCODE_2RI12	0x0a	/* addi.w, addi.d, lu52i.d, etc */
+#define	OPCODE_2RI14	0x03	/* ll.w, sc.w, ll.d, sc.d */
+#define	OPCODE_2RI16	0x05	/* jirl, beq, bne, blt, bge, bltu, bgeu */
+#define	OPCODE_3R	0x00	/* add.w, add.d, sub.w, sub.d, etc */
+#define	OPCODE_4R	0x00	/* fadd.s, fadd.d, etc (with func) */
+#define	OPCODE_2R	0x00	/* csrrd, csrwr, csrxchg */
+
+/* General purpose register names */
+static const char * const gpr_name[32] __unused = {
+	"$r0",	"$r1",	"$r2",	"$r3",	"$r4",	"$r5",	"$r6",	"$r7",
+	"$r8",	"$r9",	"$r10",	"$r11",	"$r12",	"$r13",	"$r14",	"$r15",
+	"$r16",	"$r17",	"$r18",	"$r19",	"$r20",	"$r21",	"$r22",	"$r23",
+	"$r24",	"$r25",	"$r26",	"$r27",	"$r28",	"$r29",	"$r30",	"$r31"
 };
 
-static char *fp_reg_name[32] = {
-	"ft0", "ft1", "ft2",  "ft3",  "ft4", "ft5", "ft6",  "ft7",
-	"fs0", "fs1", "fa0",  "fa1",  "fa2", "fa3", "fa4",  "fa5",
-	"fa6", "fa7", "fs2",  "fs3",  "fs4", "fs5", "fs6",  "fs7",
-	"fs8", "fs9", "fs10", "fs11", "ft8", "ft9", "ft10", "ft11"
+/* Aliases for general purpose registers */
+static const char *gpr_alias[32] = {
+	"$zero",	"$ra",	"$tp",	"$sp",
+	"$a0",	"$a1",	"$a2",	"$a3",	"$a4",	"$a5",	"$a6",	"$a7",
+	"$t0",	"$t1",	"$t2",	"$t3",	"$t4",	"$t5",	"$t6",	"$t7",	"$t8",
+	"$u0",	"$fp",	"$s0",	"$s1",	"$s2",	"$s3",	"$s4",	"$s5",	"$s6",	"$s7",	"$s8"
 };
 
-struct riscv_op {
-	char *name;
-	char *fmt;
-	int match;
-	int mask;
-	int (*match_func)(struct riscv_op *op, uint32_t insn);
+/* Floating point register names */
+static const char * const fpr_name[32] __unused = {
+	"$f0",	"$f1",	"$f2",	"$f3",	"$f4",	"$f5",	"$f6",	"$f7",
+	"$f8",	"$f9",	"$f10",	"$f11",	"$f12",	"$f13",	"$f14",	"$f15",
+	"$f16",	"$f17",	"$f18",	"$f19",	"$f20",	"$f21",	"$f22",	"$f23",
+	"$f24",	"$f25",	"$f26",	"$f27",	"$f28",	"$f29",	"$f30",	"$f31"
+};
+
+/* Aliases for floating point registers */
+static const char *fpr_alias[32] = {
+	"$fa0",	"$fa1",	"$fa2",	"$fa3",	"$fa4",	"$fa5",	"$fa6",	"$fa7",
+	"$ft0",	"$ft1",	"$ft2",	"$ft3",	"$ft4",	"$ft5",	"$ft6",	"$ft7",
+	"$ft8",	"$ft9",	"$ft10",	"$ft11",	"$ft12",	"$ft13",	"$ft14",	"$ft15",
+	"$fs0",	"$fs1",	"$fs2",	"$fs3",	"$fs4",	"$fs5",	"$fs6",	"$fs7"
+};
+
+/* Use aliases for better readability */
+#define	GPR_NAME(r)	gpr_alias[(r)]
+#define	FPR_NAME(f)	fpr_alias[(f)]
+
+struct loongarch_op {
+	const char *name;
+	uint32_t opcode;
+	uint32_t mask;
+	const char *fmt;
+};
+
+/*
+ * Instruction format characters:
+ * d - destination register (rd)
+ * j - source register 1 (rj)
+ * k - source register 2 (rk)
+ * a - source register 3 (ra)
+ * D - floating point destination (fd)
+ * J - floating point source 1 (fj)
+ * K - floating point source 2 (fk)
+ * A - floating point source 3 (fa)
+ * i - immediate value (12-bit signed)
+ * I - immediate value (14-bit signed)
+ * b - branch offset
+ * c - CSR register
+ */
+
+/* 3R-type instructions (opcode = 0x00) */
+static const struct loongarch_op op_3r[] = {
+	/* Integer arithmetic */
+	{ "add.w",	0x00100000, 0x003f8000, "djk" },
+	{ "add.d",	0x00108000, 0x003f8000, "djk" },
+	{ "sub.w",	0x00110000, 0x003f8000, "djk" },
+	{ "sub.d",	0x00118000, 0x003f8000, "djk" },
+	{ "slt",	0x00120000, 0x003f8000, "djk" },
+	{ "sltu",	0x00128000, 0x003f8000, "djk" },
+	{ "slti",	0x00130000, 0x003f8000, "djk" },
+	{ "sltui",	0x00138000, 0x003f8000, "djk" },
+	{ "and",	0x00140000, 0x003f8000, "djk" },
+	{ "or",		0x00148000, 0x003f8000, "djk" },
+	{ "xor",	0x00150000, 0x003f8000, "djk" },
+	{ "nor",	0x00158000, 0x003f8000, "djk" },
+	{ "andn",	0x00160000, 0x003f8000, "djk" },
+	{ "orn",	0x00168000, 0x003f8000, "djk" },
+	/* Shift operations */
+	{ "sll.w",	0x00180000, 0x003f8000, "djk" },
+	{ "srl.w",	0x00188000, 0x003f8000, "djk" },
+	{ "sra.w",	0x00190000, 0x003f8000, "djk" },
+	{ "sll.d",	0x00198000, 0x003f8000, "djk" },
+	{ "srl.d",	0x001a0000, 0x003f8000, "djk" },
+	{ "sra.d",	0x001a8000, 0x003f8000, "djk" },
+	/* Bit operations */
+	{ "rotr.w",	0x001b0000, 0x003f8000, "djk" },
+	{ "rotr.d",	0x001b8000, 0x003f8000, "djk" },
+	/* Multiply/divide */
+	{ "mul.w",	0x001c0000, 0x003f8000, "djk" },
+	{ "mulh.w",	0x001c8000, 0x003f8000, "djk" },
+	{ "mulh.wu",	0x001d0000, 0x003f8000, "djk" },
+	{ "mul.d",	0x001d8000, 0x003f8000, "djk" },
+	{ "mulh.d",	0x001e0000, 0x003f8000, "djk" },
+	{ "mulh.du",	0x001e8000, 0x003f8000, "djk" },
+	{ "mulw.d.w",	0x001f0000, 0x003f8000, "djk" },
+	{ "mulw.d.wu",	0x001f8000, 0x003f8000, "djk" },
+	{ "div.w",	0x00200000, 0x003f8000, "djk" },
+	{ "mod.w",	0x00208000, 0x003f8000, "djk" },
+	{ "div.wu",	0x00210000, 0x003f8000, "djk" },
+	{ "mod.wu",	0x00218000, 0x003f8000, "djk" },
+	{ "div.d",	0x00220000, 0x003f8000, "djk" },
+	{ "mod.d",	0x00228000, 0x003f8000, "djk" },
+	{ "div.du",	0x00230000, 0x003f8000, "djk" },
+	{ "mod.du",	0x00238000, 0x003f8000, "djk" },
+	/* Breakpoint */
+	{ "break",	0x002a0000, 0x003ffc00, "i" },
+	{ "dblock",	0x002a8000, 0x003f8000, "" },
+	/* CRC */
+	{ "crc.w.b.w",	0x002b0000, 0x003f8000, "djk" },
+	{ "crc.w.h.w",	0x002b8000, 0x003f8000, "djk" },
+	{ "crc.w.w.w",	0x002c0000, 0x003f8000, "djk" },
+	{ "crc.w.d.w",	0x002c8000, 0x003f8000, "djk" },
+	{ "crcc.w.b.w",	0x002d0000, 0x003f8000, "djk" },
+	{ "crcc.w.h.w",	0x002d8000, 0x003f8000, "djk" },
+	{ "crcc.w.w.w",	0x002e0000, 0x003f8000, "djk" },
+	{ "crcc.w.d.w",	0x002e8000, 0x003f8000, "djk" },
+	/* System call */
+	{ "syscall",	0x002b0000, 0x003ffc00, "i" },
+	/* NULL terminator */
+	{ NULL, 0, 0, NULL }
+};
+
+/* 2RI12-type instructions (opcode = 0x0a) */
+/* Note: These instructions have 12-bit immediate at bits 10-21 */
+static const struct loongarch_op op_2ri12[] = {
+	{ "addi.w",	0x02800000, 0xffc00000, "dji" },
+	{ "addi.d",	0x02840000, 0xffc40000, "dji" },
+	{ "lu52i.d",	0x02880000, 0xffc40000, "dji" },
+	{ "andi",	0x028c0000, 0xffc40000, "dji" },
+	{ "ori",	0x02900000, 0xffc40000, "dji" },
+	{ "xori",	0x02940000, 0xffc40000, "dji" },
+	{ "lu12i.w",	0x0a000000, 0xffc00000, "di" },
+	{ "lu32i.d",	0x0b000000, 0xffc00000, "di" },
+	{ "pcaddi",	0x0c000000, 0xffc00000, "db" },
+	{ "pcaddu12i",	0x0c400000, 0xffc00000, "db" },
+	{ "pcaddu18i",	0x0c800000, 0xffc00000, "db" },
+	{ "pcalau12i",	0x0cc00000, 0xffc00000, "db" },
+	{ "ll.w",	0x20000000, 0xff000000, "dji" },
+	{ "sc.w",	0x21000000, 0xff000000, "dji" },
+	{ "ll.d",	0x22000000, 0xff000000, "dji" },
+	{ "sc.d",	0x23000000, 0xff000000, "dji" },
+	/* NULL terminator */
+	{ NULL, 0, 0, NULL }
+};
+
+/* 2RI16-type instructions (opcode = 0x05) */
+static const struct loongarch_op op_2ri16[] = {
+	{ "jirl",	0x14000000, 0xfc000000, "djb" },
+	{ "beq",	0x14400000, 0xfc000000, "jkb" },
+	{ "bne",	0x14800000, 0xfc000000, "jkb" },
+	{ "blt",	0x14c00000, 0xfc000000, "jkb" },
+	{ "bge",	0x15000000, 0xfc000000, "jkb" },
+	{ "bltu",	0x15400000, 0xfc000000, "jkb" },
+	{ "bgeu",	0x15800000, 0xfc000000, "jkb" },
+	/* NULL terminator */
+	{ NULL, 0, 0, NULL }
+};
+
+/* 1RI21-type instructions (opcode = 0x02) */
+static const struct loongarch_op op_1ri21[] = {
+	{ "beqz",	0x08000000, 0xfc1f0000, "jb" },
+	{ "bnez",	0x08200000, 0xfc1f0000, "jb" },
+	{ "b",		0x10000000, 0xfc000000, "b" },
+	{ "bl",		0x14000000, 0xfc000000, "b" },
+	/* NULL terminator */
+	{ NULL, 0, 0, NULL }
+};
+
+/* Load/Store instructions */
+static const struct loongarch_op op_load_store[] = {
+	{ "ld.b",	0x28000000, 0xff000000, "dji" },
+	{ "ld.h",	0x29000000, 0xff000000, "dji" },
+	{ "ld.w",	0x2a000000, 0xff000000, "dji" },
+	{ "ld.d",	0x2b000000, 0xff000000, "dji" },
+	{ "ld.bu",	0x2c000000, 0xff000000, "dji" },
+	{ "ld.hu",	0x2d000000, 0xff000000, "dji" },
+	{ "ld.wu",	0x2e000000, 0xff000000, "dji" },
+	{ "st.b",	0x30000000, 0xff000000, "dji" },
+	{ "st.h",	0x31000000, 0xff000000, "dji" },
+	{ "st.w",	0x32000000, 0xff000000, "dji" },
+	{ "st.d",	0x33000000, 0xff000000, "dji" },
+	{ "fld.s",	0x34000000, 0xff000000, "Dji" },
+	{ "fst.s",	0x35000000, 0xff000000, "Dji" },
+	{ "fld.d",	0x36000000, 0xff000000, "Dji" },
+	{ "fst.d",	0x37000000, 0xff000000, "Dji" },
+	/* NULL terminator */
+	{ NULL, 0, 0, NULL }
+};
+
+/* CSR instructions */
+static const struct loongarch_op op_csr[] = {
+	{ "csrrd",	0x04000000, 0xfff80000, "dc" },
+	{ "csrwr",	0x04040000, 0xfff80000, "jc" },
+	{ "csrxchg",	0x04080000, 0xfff80000, "jkc" },
+	/* NULL terminator */
+	{ NULL, 0, 0, NULL }
+};
+
+/* IOCSR instructions */
+static const struct loongarch_op op_iocsr[] = {
+	{ "iocsrrd.b",	0x04200000, 0xffff8000, "dj" },
+	{ "iocsrrd.h",	0x04208000, 0xffff8000, "dj" },
+	{ "iocsrrd.w",	0x04210000, 0xffff8000, "dj" },
+	{ "iocsrrd.d",	0x04218000, 0xffff8000, "dj" },
+	{ "iocsrwr.b",	0x04220000, 0xffff8000, "dj" },
+	{ "iocsrwr.h",	0x04228000, 0xffff8000, "dj" },
+	{ "iocsrwr.w",	0x04230000, 0xffff8000, "dj" },
+	{ "iocsrwr.d",	0x04238000, 0xffff8000, "dj" },
+	/* NULL terminator */
+	{ NULL, 0, 0, NULL }
+};
+
+/* TLB instructions */
+static const struct loongarch_op op_tlb[] = {
+	{ "tlbsrch",	0x04240000, 0xffffffff, "" },
+	{ "tlbrd",	0x04248000, 0xffffffff, "" },
+	{ "tlbwr",	0x04250000, 0xffffffff, "" },
+	{ "tlbfill",	0x04258000, 0xffffffff, "" },
+	{ "tlbclr",	0x04260000, 0xffffffff, "" },
+	{ "tlbflush",	0x04268000, 0xffffffff, "" },
+	{ "invtlb",	0x04270000, 0xfff80000, "jki" },
+	/* NULL terminator */
+	{ NULL, 0, 0, NULL }
+};
+
+/* Cache instructions */
+static const struct loongarch_op op_cache[] = {
+	{ "cacop",	0x06000000, 0xff000000, "iji" },
+	{ "lddir",	0x06400000, 0xffe00000, "dji" },
+	{ "ldpte",	0x06600000, 0xffe00000, "ji" },
+	{ "ertn",	0x06800000, 0xffffffff, "" },
+	{ "idle",	0x06808000, 0xffffffff, "" },
+	{ "dbar",	0x06810000, 0xfff80000, "i" },
+	{ "ibar",	0x06818000, 0xfff80000, "i" },
+	{ "extop",	0x06820000, 0xffffffff, "" },
+	/* NULL terminator */
+	{ NULL, 0, 0, NULL }
+};
+
+/* Floating point instructions */
+static const struct loongarch_op op_fp[] = {
+	{ "fadd.s",	0x01000000, 0x003f8000, "DJK" },
+	{ "fadd.d",	0x01008000, 0x003f8000, "DJK" },
+	{ "fsub.s",	0x01010000, 0x003f8000, "DJK" },
+	{ "fsub.d",	0x01018000, 0x003f8000, "DJK" },
+	{ "fmul.s",	0x01020000, 0x003f8000, "DJK" },
+	{ "fmul.d",	0x01028000, 0x003f8000, "DJK" },
+	{ "fdiv.s",	0x01030000, 0x003f8000, "DJK" },
+	{ "fdiv.d",	0x01038000, 0x003f8000, "DJK" },
+	{ "fmax.s",	0x01040000, 0x003f8000, "DJK" },
+	{ "fmax.d",	0x01048000, 0x003f8000, "DJK" },
+	{ "fmin.s",	0x01050000, 0x003f8000, "DJK" },
+	{ "fmin.d",	0x01058000, 0x003f8000, "DJK" },
+	{ "fmaxa.s",	0x01060000, 0x003f8000, "DJK" },
+	{ "fmaxa.d",	0x01068000, 0x003f8000, "DJK" },
+	{ "fmina.s",	0x01070000, 0x003f8000, "DJK" },
+	{ "fmina.d",	0x01078000, 0x003f8000, "DJK" },
+	{ "fscaleb.s",	0x01080000, 0x003f8000, "DJK" },
+	{ "fscaleb.d",	0x01088000, 0x003f8000, "DJK" },
+	{ "fcopysign.s", 0x01090000, 0x003f8000, "DJK" },
+	{ "fcopysign.d", 0x01098000, 0x003f8000, "DJK" },
+	{ "fabs.s",	0x010a0000, 0x003f8000, "DJ" },
+	{ "fabs.d",	0x010a8000, 0x003f8000, "DJ" },
+	{ "fneg.s",	0x010b0000, 0x003f8000, "DJ" },
+	{ "fneg.d",	0x010b8000, 0x003f8000, "DJ" },
+	{ "flogb.s",	0x010c0000, 0x003f8000, "DJ" },
+	{ "flogb.d",	0x010c8000, 0x003f8000, "DJ" },
+	{ "fclass.s",	0x010d0000, 0x003f8000, "DJ" },
+	{ "fclass.d",	0x010d8000, 0x003f8000, "DJ" },
+	{ "fsqrt.s",	0x010e0000, 0x003f8000, "DJ" },
+	{ "fsqrt.d",	0x010e8000, 0x003f8000, "DJ" },
+	{ "frecip.s",	0x010f0000, 0x003f8000, "DJ" },
+	{ "frecip.d",	0x010f8000, 0x003f8000, "DJ" },
+	{ "frsqrt.s",	0x01100000, 0x003f8000, "DJ" },
+	{ "frsqrt.d",	0x01108000, 0x003f8000, "DJ" },
+	{ "fmov.s",	0x01120000, 0x003f8000, "DJ" },
+	{ "fmov.d",	0x01128000, 0x003f8000, "DJ" },
+	{ "movgr2fr.w",	0x01130000, 0x003f8000, "Dj" },
+	{ "movgr2fr.d",	0x01138000, 0x003f8000, "Dj" },
+	{ "movfr2gr.s",	0x01140000, 0x003f8000, "dJ" },
+	{ "movfr2gr.d",	0x01148000, 0x003f8000, "dJ" },
+	{ "movgr2fcsr",	0x01150000, 0x003f8000, "cj" },
+	{ "movfcsr2gr",	0x01158000, 0x003f8000, "dc" },
+	{ "movfr2cf",	0x01160000, 0x003f8000, "cJ" },
+	{ "movcf2fr",	0x01168000, 0x003f8000, "Dc" },
+	{ "movgr2cf",	0x01170000, 0x003f8000, "cj" },
+	{ "movcf2gr",	0x01178000, 0x003f8000, "dc" },
+	{ "fcvt.s.d",	0x01190000, 0x003f8000, "DJ" },
+	{ "fcvt.d.s",	0x01198000, 0x003f8000, "DJ" },
+	{ "ftintrm.w.s", 0x011a0000, 0x003f8000, "dJ" },
+	{ "ftintrm.w.d", 0x011a8000, 0x003f8000, "dJ" },
+	{ "ftintrm.l.s", 0x011b0000, 0x003f8000, "dJ" },
+	{ "ftintrm.l.d", 0x011b8000, 0x003f8000, "dJ" },
+	{ "ftintrp.w.s", 0x011c0000, 0x003f8000, "dJ" },
+	{ "ftintrp.w.d", 0x011c8000, 0x003f8000, "dJ" },
+	{ "ftintrp.l.s", 0x011d0000, 0x003f8000, "dJ" },
+	{ "ftintrp.l.d", 0x011d8000, 0x003f8000, "dJ" },
+	{ "ftintrz.w.s", 0x011e0000, 0x003f8000, "dJ" },
+	{ "ftintrz.w.d", 0x011e8000, 0x003f8000, "dJ" },
+	{ "ftintrz.l.s", 0x011f0000, 0x003f8000, "dJ" },
+	{ "ftintrz.l.d", 0x011f8000, 0x003f8000, "dJ" },
+	{ "ftint.w.s",	0x01200000, 0x003f8000, "dJ" },
+	{ "ftint.w.d",	0x01208000, 0x003f8000, "dJ" },
+	{ "ftint.l.s",	0x01210000, 0x003f8000, "dJ" },
+	{ "ftint.l.d",	0x01218000, 0x003f8000, "dJ" },
+	{ "ffint.s.w",	0x01220000, 0x003f8000, "Dj" },
+	{ "ffint.s.l",	0x01228000, 0x003f8000, "Dj" },
+	{ "ffint.d.w",	0x01230000, 0x003f8000, "Dj" },
+	{ "ffint.d.l",	0x01238000, 0x003f8000, "Dj" },
+	{ "frint.s",	0x01240000, 0x003f8000, "DJ" },
+	{ "frint.d",	0x01248000, 0x003f8000, "DJ" },
+	{ "fcmp.s",	0x01280000, 0x003f8000, "jJc" },
+	{ "fcmp.d",	0x01288000, 0x003f8000, "jJc" },
+	{ "fsel",	0x012c0000, 0x003f8000, "DJKc" },
+	/* NULL terminator */
+	{ NULL, 0, 0, NULL }
+};
+
+/* Special instructions */
+static const struct loongarch_op op_special[] = {
+	{ "nop",	0x03400000, 0xffffffff, "" },
+	{ "ret",	0x14002000, 0xffffffff, "" },	/* jirl $r0, $r1, 0 */
+	{ NULL, 0, 0, NULL }
 };
 
 static int
-m_op(struct riscv_op *op, uint32_t insn)
+sign_extend(uint32_t val, int bits)
 {
 
-	if (((insn ^ op->match) & op->mask) == 0)
-		return (1);
-
-	return (0);
+	if (val & (1 << (bits - 1)))
+		return (val | (~0u << bits));
+	return (val);
 }
 
-static struct riscv_op riscv_opcodes[] = {
-	/* Aliases first */
-	{"ret","", MATCH_JALR | (X_RA << RS1_SHIFT),
-	    MASK_JALR | RD_MASK | RS1_MASK | IMM_MASK, m_op },
-
-	{ "beq",	"s,t,p", 	MATCH_BEQ, MASK_BEQ,		m_op },
-	{ "bne",	"s,t,p", 	MATCH_BNE, MASK_BNE,		m_op },
-	{ "blt",	"s,t,p", 	MATCH_BLT, MASK_BLT,		m_op },
-	{ "bge",	"s,t,p", 	MATCH_BGE, MASK_BGE,		m_op },
-	{ "bltu",	"s,t,p", 	MATCH_BLTU, MASK_BLTU,		m_op },
-	{ "bgeu",	"s,t,p", 	MATCH_BGEU, MASK_BGEU,		m_op },
-	{ "jalr",	"d,o(s)", 	MATCH_JALR, MASK_JALR,		m_op },
-	{ "jal",	"d,a", 		MATCH_JAL, MASK_JAL,		m_op },
-	{ "lui",	"d,u", 		MATCH_LUI, MASK_LUI,		m_op },
-	{ "auipc",	"d,u", 		MATCH_AUIPC, MASK_AUIPC,	m_op },
-	{ "addi",	"d,s,j", 	MATCH_ADDI, MASK_ADDI,		m_op },
-	{ "slli",	"d,s,>", 	MATCH_SLLI, MASK_SLLI,		m_op },
-	{ "slti",	"d,s,j", 	MATCH_SLTI, MASK_SLTI,		m_op },
-	{ "sltiu",	"d,s,j", 	MATCH_SLTIU, MASK_SLTIU,	m_op },
-	{ "xori",	"d,s,j", 	MATCH_XORI, MASK_XORI,		m_op },
-	{ "srli",	"d,s,>", 	MATCH_SRLI, MASK_SRLI,		m_op },
-	{ "srai",	"d,s,>", 	MATCH_SRAI, MASK_SRAI,		m_op },
-	{ "ori",	"d,s,j", 	MATCH_ORI, MASK_ORI,		m_op },
-	{ "andi",	"d,s,j", 	MATCH_ANDI, MASK_ANDI,		m_op },
-	{ "add",	"d,s,t", 	MATCH_ADD, MASK_ADD,		m_op },
-	{ "sub",	"d,s,t", 	MATCH_SUB, MASK_SUB,		m_op },
-	{ "sll",	"d,s,t", 	MATCH_SLL, MASK_SLL,		m_op },
-	{ "slt",	"d,s,t", 	MATCH_SLT, MASK_SLT,		m_op },
-	{ "sltu",	"d,s,t", 	MATCH_SLTU, MASK_SLTU,		m_op },
-	{ "xor",	"d,s,t", 	MATCH_XOR, MASK_XOR,		m_op },
-	{ "srl",	"d,s,t", 	MATCH_SRL, MASK_SRL,		m_op },
-	{ "sra",	"d,s,t", 	MATCH_SRA, MASK_SRA,		m_op },
-	{ "or",		"d,s,t", 	MATCH_OR, MASK_OR,		m_op },
-	{ "and",	"d,s,t", 	MATCH_AND, MASK_AND,		m_op },
-	{ "addiw",	"d,s,j", 	MATCH_ADDIW, MASK_ADDIW,	m_op },
-	{ "slliw",	"d,s,<", 	MATCH_SLLIW, MASK_SLLIW,	m_op },
-	{ "srliw",	"d,s,<", 	MATCH_SRLIW, MASK_SRLIW,	m_op },
-	{ "sraiw",	"d,s,<", 	MATCH_SRAIW, MASK_SRAIW,	m_op },
-	{ "addw",	"d,s,t", 	MATCH_ADDW, MASK_ADDW,		m_op },
-	{ "subw",	"d,s,t", 	MATCH_SUBW, MASK_SUBW,		m_op },
-	{ "sllw",	"d,s,t", 	MATCH_SLLW, MASK_SLLW,		m_op },
-	{ "srlw",	"d,s,t", 	MATCH_SRLW, MASK_SRLW,		m_op },
-	{ "sraw",	"d,s,t", 	MATCH_SRAW, MASK_SRAW,		m_op },
-	{ "lb",		"d,o(s)", 	MATCH_LB, MASK_LB,		m_op },
-	{ "lh",		"d,o(s)", 	MATCH_LH, MASK_LH,		m_op },
-	{ "lw",		"d,o(s)", 	MATCH_LW, MASK_LW,		m_op },
-	{ "ld",		"d,o(s)", 	MATCH_LD, MASK_LD,		m_op },
-	{ "lbu",	"d,o(s)", 	MATCH_LBU, MASK_LBU,		m_op },
-	{ "lhu",	"d,o(s)", 	MATCH_LHU, MASK_LHU,		m_op },
-	{ "lwu",	"d,o(s)", 	MATCH_LWU, MASK_LWU,		m_op },
-	{ "sb",		"t,q(s)", 	MATCH_SB, MASK_SB,		m_op },
-	{ "sh",		"t,q(s)", 	MATCH_SH, MASK_SH,		m_op },
-	{ "sw",		"t,q(s)", 	MATCH_SW, MASK_SW,		m_op },
-	{ "sd",		"t,q(s)", 	MATCH_SD, MASK_SD,		m_op },
-	{ "fence",	"P,Q",		MATCH_FENCE, MASK_FENCE,	m_op },
-	{ "fence.i",	"",		MATCH_FENCE_I, MASK_FENCE_I,	m_op },
-	{ "mul",	"d,s,t", 	MATCH_MUL, MASK_MUL,		m_op },
-	{ "mulh",	"d,s,t", 	MATCH_MULH, MASK_MULH,		m_op },
-	{ "mulhsu",	"d,s,t", 	MATCH_MULHSU, MASK_MULHSU,	m_op },
-	{ "mulhu",	"d,s,t", 	MATCH_MULHU, MASK_MULHU,	m_op },
-	{ "div",	"d,s,t", 	MATCH_DIV, MASK_DIV,		m_op },
-	{ "divu",	"d,s,t", 	MATCH_DIVU, MASK_DIVU,		m_op },
-	{ "rem",	"d,s,t", 	MATCH_REM, MASK_REM,		m_op },
-	{ "remu",	"d,s,t", 	MATCH_REMU, MASK_REMU,		m_op },
-	{ "mulw",	"d,s,t", 	MATCH_MULW, MASK_MULW,		m_op },
-	{ "divw",	"d,s,t", 	MATCH_DIVW, MASK_DIVW,		m_op },
-	{ "divuw",	"d,s,t", 	MATCH_DIVUW, MASK_DIVUW,	m_op },
-	{ "remw",	"d,s,t", 	MATCH_REMW, MASK_REMW,		m_op },
-	{ "remuw",	"d,s,t", 	MATCH_REMUW, MASK_REMUW,	m_op },
-	{ "amoadd.w",	"d,t,0(s)", 	MATCH_AMOADD_W, MASK_AMOADD_W,	m_op },
-	{ "amoxor.w",	"d,t,0(s)", 	MATCH_AMOXOR_W, MASK_AMOXOR_W,	m_op },
-	{ "amoor.w",	"d,t,0(s)", 	MATCH_AMOOR_W, MASK_AMOOR_W,	m_op },
-	{ "amoand.w",	"d,t,0(s)", 	MATCH_AMOAND_W, MASK_AMOAND_W,	m_op },
-	{ "amomin.w",	"d,t,0(s)", 	MATCH_AMOMIN_W, MASK_AMOMIN_W,	m_op },
-	{ "amomax.w",	"d,t,0(s)", 	MATCH_AMOMAX_W, MASK_AMOMAX_W,	m_op },
-	{ "amominu.w",	"d,t,0(s)", 	MATCH_AMOMINU_W, MASK_AMOMINU_W,m_op },
-	{ "amomaxu.w",	"d,t,0(s)", 	MATCH_AMOMAXU_W, MASK_AMOMAXU_W,m_op },
-	{ "amoswap.w",	"d,t,0(s)", 	MATCH_AMOSWAP_W, MASK_AMOSWAP_W,m_op },
-	{ "lr.w",	"d,0(s)", 	MATCH_LR_W, MASK_LR_W,		m_op },
-	{ "sc.w",	"d,t,0(s)", 	MATCH_SC_W, MASK_SC_W,		m_op },
-	{ "amoadd.d",	"d,t,0(s)", 	MATCH_AMOADD_D, MASK_AMOADD_D,	m_op },
-	{ "amoxor.d",	"d,t,0(s)", 	MATCH_AMOXOR_D, MASK_AMOXOR_D,	m_op },
-	{ "amoor.d",	"d,t,0(s)", 	MATCH_AMOOR_D, MASK_AMOOR_D,	m_op },
-	{ "amoand.d",	"d,t,0(s)", 	MATCH_AMOAND_D, MASK_AMOAND_D,	m_op },
-	{ "amomin.d",	"d,t,0(s)", 	MATCH_AMOMIN_D, MASK_AMOMIN_D,	m_op },
-	{ "amomax.d",	"d,t,0(s)", 	MATCH_AMOMAX_D, MASK_AMOMAX_D,	m_op },
-	{ "amominu.d",	"d,t,0(s)", 	MATCH_AMOMINU_D, MASK_AMOMINU_D,m_op },
-	{ "amomaxu.d",	"d,t,0(s)", 	MATCH_AMOMAXU_D, MASK_AMOMAXU_D,m_op },
-	{ "amoswap.d",	"d,t,0(s)", 	MATCH_AMOSWAP_D, MASK_AMOSWAP_D,m_op },
-	{ "lr.d",	"d,0(s)", 	MATCH_LR_D, MASK_LR_D,		m_op },
-	{ "sc.d",	"d,t,0(s)", 	MATCH_SC_D, MASK_SC_D,		m_op },
-	{ "ecall",	"", 		MATCH_ECALL, MASK_ECALL,	m_op },
-	{ "ebreak",	"", 		MATCH_EBREAK, MASK_EBREAK,	m_op },
-	{ "uret",	"", 		MATCH_URET, MASK_URET,		m_op },
-	{ "sret",	"", 		MATCH_SRET, MASK_SRET,		m_op },
-	{ "mret",	"", 		MATCH_MRET, MASK_MRET,		m_op },
-	{ "dret",	"", 		MATCH_DRET, MASK_DRET,		m_op },
-	{ "sfence.vma",	"", 	MATCH_SFENCE_VMA, MASK_SFENCE_VMA,	m_op },
-	{ "wfi",	"", 		MATCH_WFI, MASK_WFI,		m_op },
-	{ "csrrw",	"d,E,s", 	MATCH_CSRRW, MASK_CSRRW,	m_op },
-	{ "csrrs",	"d,E,s", 	MATCH_CSRRS, MASK_CSRRS,	m_op },
-	{ "csrrc",	"d,E,s", 	MATCH_CSRRC, MASK_CSRRC,	m_op },
-	{ "csrrwi",	"d,E,Z", 	MATCH_CSRRWI, MASK_CSRRWI,	m_op },
-	{ "csrrsi",	"d,E,Z", 	MATCH_CSRRSI, MASK_CSRRSI,	m_op },
-	{ "csrrci",	"d,E,Z", 	MATCH_CSRRCI, MASK_CSRRCI,	m_op },
-	{ "fadd.s",	"D,S,T", 	MATCH_FADD_S, MASK_FADD_S,	m_op },
-	{ "fsub.s",	"D,S,T", 	MATCH_FSUB_S, MASK_FSUB_S,	m_op },
-	{ "fmul.s",	"D,S,T", 	MATCH_FMUL_S, MASK_FMUL_S,	m_op },
-	{ "fdiv.s",	"D,S,T", 	MATCH_FDIV_S, MASK_FDIV_S,	m_op },
-	{ "fsgnj.s",	"D,S,T", 	MATCH_FSGNJ_S, MASK_FSGNJ_S,	m_op },
-	{ "fsgnjn.s",	"D,S,T", 	MATCH_FSGNJN_S, MASK_FSGNJN_S,	m_op },
-	{ "fsgnjx.s",	"D,S,T", 	MATCH_FSGNJX_S, MASK_FSGNJX_S,	m_op },
-	{ "fmin.s",	"D,S,T", 	MATCH_FMIN_S, MASK_FMIN_S,	m_op },
-	{ "fmax.s",	"D,S,T", 	MATCH_FMAX_S, MASK_FMAX_S,	m_op },
-	{ "fsqrt.s",	"D,S", 		MATCH_FSQRT_S, MASK_FSQRT_S,	m_op },
-	{ "fadd.d",	"D,S,T", 	MATCH_FADD_D, MASK_FADD_D,	m_op },
-	{ "fsub.d",	"D,S,T", 	MATCH_FSUB_D, MASK_FSUB_D,	m_op },
-	{ "fmul.d",	"D,S,T", 	MATCH_FMUL_D, MASK_FMUL_D,	m_op },
-	{ "fdiv.d",	"D,S,T", 	MATCH_FDIV_D, MASK_FDIV_D,	m_op },
-	{ "fsgnj.d",	"D,S,T", 	MATCH_FSGNJ_D, MASK_FSGNJ_D,	m_op },
-	{ "fsgnjn.d",	"D,S,T", 	MATCH_FSGNJN_D, MASK_FSGNJN_D,	m_op },
-	{ "fsgnjx.d",	"D,S,T", 	MATCH_FSGNJX_D, MASK_FSGNJX_D,	m_op },
-	{ "fmin.d",	"D,S,T", 	MATCH_FMIN_D, MASK_FMIN_D,	m_op },
-	{ "fmax.d",	"D,S,T", 	MATCH_FMAX_D, MASK_FMAX_D,	m_op },
-	{ "fcvt.s.d",	"D,S", 		MATCH_FCVT_S_D, MASK_FCVT_S_D,	m_op },
-	{ "fcvt.d.s",	"D,S", 		MATCH_FCVT_D_S, MASK_FCVT_D_S,	m_op },
-	{ "fsqrt.d",	"D,S", 		MATCH_FSQRT_D, MASK_FSQRT_D,	m_op },
-	{ "fadd.q",	"D,S,T", 	MATCH_FADD_Q, MASK_FADD_Q,	m_op },
-	{ "fsub.q",	"D,S,T", 	MATCH_FSUB_Q, MASK_FSUB_Q,	m_op },
-	{ "fmul.q",	"D,S,T", 	MATCH_FMUL_Q, MASK_FMUL_Q,	m_op },
-	{ "fdiv.q",	"D,S,T", 	MATCH_FDIV_Q, MASK_FDIV_Q,	m_op },
-	{ "fsgnj.q",	"D,S,T", 	MATCH_FSGNJ_Q, MASK_FSGNJ_Q,	m_op },
-	{ "fsgnjn.q",	"D,S,T", 	MATCH_FSGNJN_Q, MASK_FSGNJN_Q,	m_op },
-	{ "fsgnjx.q",	"D,S,T", 	MATCH_FSGNJX_Q, MASK_FSGNJX_Q,	m_op },
-	{ "fmin.q",	"D,S,T", 	MATCH_FMIN_Q, MASK_FMIN_Q,	m_op },
-	{ "fmax.q",	"D,S,T", 	MATCH_FMAX_Q, MASK_FMAX_Q,	m_op },
-	{ "fcvt.s.q",	"D,S", 		MATCH_FCVT_S_Q, MASK_FCVT_S_Q,	m_op },
-	{ "fcvt.q.s",	"D,S", 		MATCH_FCVT_Q_S, MASK_FCVT_Q_S,	m_op },
-	{ "fcvt.d.q",	"D,S", 		MATCH_FCVT_D_Q, MASK_FCVT_D_Q,	m_op },
-	{ "fcvt.q.d",	"D,S", 		MATCH_FCVT_Q_D, MASK_FCVT_Q_D,	m_op },
-	{ "fsqrt.q",	"D,S", 		MATCH_FSQRT_Q, MASK_FSQRT_Q,	m_op },
-	{ "fle.s",	"d,S,T", 	MATCH_FLE_S, MASK_FLE_S,	m_op },
-	{ "flt.s",	"d,S,T", 	MATCH_FLT_S, MASK_FLT_S,	m_op },
-	{ "feq.s",	"d,S,T", 	MATCH_FEQ_S, MASK_FEQ_S,	m_op },
-	{ "fle.d",	"d,S,T", 	MATCH_FLE_D, MASK_FLE_D,	m_op },
-	{ "flt.d",	"d,S,T", 	MATCH_FLT_D, MASK_FLT_D,	m_op },
-	{ "feq.d",	"d,S,T", 	MATCH_FEQ_D, MASK_FEQ_D,	m_op },
-	{ "fle.q",	"d,S,T", 	MATCH_FLE_Q, MASK_FLE_Q,	m_op },
-	{ "flt.q",	"d,S,T", 	MATCH_FLT_Q, MASK_FLT_Q,	m_op },
-	{ "feq.q",	"d,S,T", 	MATCH_FEQ_Q, MASK_FEQ_Q,	m_op },
-	{ "fcvt.w.s",	"d,S", 		MATCH_FCVT_W_S, MASK_FCVT_W_S,	m_op },
-	{ "fcvt.wu.s",	"d,S", 		MATCH_FCVT_WU_S, MASK_FCVT_WU_S,m_op },
-	{ "fcvt.l.s",	"d,S", 		MATCH_FCVT_L_S, MASK_FCVT_L_S,	m_op },
-	{ "fcvt.lu.s",	"d,S", 		MATCH_FCVT_LU_S, MASK_FCVT_LU_S,m_op },
-	{ "fmv.x.w",	"d,S", 		MATCH_FMV_X_W, MASK_FMV_X_W,	m_op },
-	{ "fclass.s",	"d,S", 		MATCH_FCLASS_S, MASK_FCLASS_S,	m_op },
-	{ "fcvt.w.d",	"d,S", 		MATCH_FCVT_W_D, MASK_FCVT_W_D,	m_op },
-	{ "fcvt.wu.d",	"d,S", 		MATCH_FCVT_WU_D, MASK_FCVT_WU_D,m_op },
-	{ "fcvt.l.d",	"d,S", 		MATCH_FCVT_L_D, MASK_FCVT_L_D,	m_op },
-	{ "fcvt.lu.d",	"d,S", 		MATCH_FCVT_LU_D, MASK_FCVT_LU_D,m_op },
-	{ "fmv.x.d",	"d,S", 		MATCH_FMV_X_D, MASK_FMV_X_D,	m_op },
-	{ "fclass.d",	"d,S", 		MATCH_FCLASS_D, MASK_FCLASS_D,	m_op },
-	{ "fcvt.w.q",	"d,S", 		MATCH_FCVT_W_Q, MASK_FCVT_W_Q,	m_op },
-	{ "fcvt.wu.q",	"d,S", 		MATCH_FCVT_WU_Q, MASK_FCVT_WU_Q,m_op },
-	{ "fcvt.l.q",	"d,S", 		MATCH_FCVT_L_Q, MASK_FCVT_L_Q,	m_op },
-	{ "fcvt.lu.q",	"d,S", 		MATCH_FCVT_LU_Q, MASK_FCVT_LU_Q,m_op },
-	{ "fmv.x.q",	"d,S", 		MATCH_FMV_X_Q, MASK_FMV_X_Q,	m_op },
-	{ "fclass.q",	"d,S", 		MATCH_FCLASS_Q, MASK_FCLASS_Q,	m_op },
-	{ "fcvt.s.w",	"D,s", 		MATCH_FCVT_S_W, MASK_FCVT_S_W,	m_op },
-	{ "fcvt.s.wu",	"D,s", 		MATCH_FCVT_S_WU, MASK_FCVT_S_WU,m_op },
-	{ "fcvt.s.l",	"D,s", 		MATCH_FCVT_S_L, MASK_FCVT_S_L,	m_op },
-	{ "fcvt.s.lu",	"D,s", 		MATCH_FCVT_S_LU, MASK_FCVT_S_LU,m_op },
-	{ "fmv.w.x",	"D,s", 		MATCH_FMV_W_X, MASK_FMV_W_X,	m_op },
-	{ "fcvt.d.w",	"D,s", 		MATCH_FCVT_D_W, MASK_FCVT_D_W,	m_op },
-	{ "fcvt.d.wu",	"D,s", 		MATCH_FCVT_D_WU, MASK_FCVT_D_WU,m_op },
-	{ "fcvt.d.l",	"D,s", 		MATCH_FCVT_D_L, MASK_FCVT_D_L,	m_op },
-	{ "fcvt.d.lu",	"D,s", 		MATCH_FCVT_D_LU, MASK_FCVT_D_LU,m_op },
-	{ "fmv.d.x",	"D,s", 		MATCH_FMV_D_X, MASK_FMV_D_X,	m_op },
-	{ "fcvt.q.w",	"D,s", 		MATCH_FCVT_Q_W, MASK_FCVT_Q_W,	m_op },
-	{ "fcvt.q.wu",	"D,s", 		MATCH_FCVT_Q_WU, MASK_FCVT_Q_WU,m_op },
-	{ "fcvt.q.l",	"D,s", 		MATCH_FCVT_Q_L, MASK_FCVT_Q_L,	m_op },
-	{ "fcvt.q.lu",	"D,s", 		MATCH_FCVT_Q_LU, MASK_FCVT_Q_LU,m_op },
-	{ "fmv.q.x",	"D,s", 		MATCH_FMV_Q_X, MASK_FMV_Q_X,	m_op },
-	{ "flw",	"D,o(s)", 	MATCH_FLW, MASK_FLW,		m_op },
-	{ "fld",	"D,o(s)", 	MATCH_FLD, MASK_FLD,		m_op },
-	{ "flq",	"D,o(s)", 	MATCH_FLQ, MASK_FLQ,		m_op },
-	{ "fsw",	"T,q(s)", 	MATCH_FSW, MASK_FSW,		m_op },
-	{ "fsd",	"T,q(s)", 	MATCH_FSD, MASK_FSD,		m_op },
-	{ "fsq",	"T,q(s)", 	MATCH_FSQ, MASK_FSQ,		m_op },
-	{ "fmadd.s",	"D,S,T,R", 	MATCH_FMADD_S, MASK_FMADD_S,	m_op },
-	{ "fmsub.s",	"D,S,T,R", 	MATCH_FMSUB_S, MASK_FMSUB_S,	m_op },
-	{ "fnmsub.s",	"D,S,T,R", 	MATCH_FNMSUB_S, MASK_FNMSUB_S,	m_op },
-	{ "fnmadd.s",	"D,S,T,R", 	MATCH_FNMADD_S, MASK_FNMADD_S,	m_op },
-	{ "fmadd.d",	"D,S,T,R", 	MATCH_FMADD_D, MASK_FMADD_D,	m_op },
-	{ "fmsub.d",	"D,S,T,R", 	MATCH_FMSUB_D, MASK_FMSUB_D,	m_op },
-	{ "fnmsub.d",	"D,S,T,R", 	MATCH_FNMSUB_D, MASK_FNMSUB_D,	m_op },
-	{ "fnmadd.d",	"D,S,T,R", 	MATCH_FNMADD_D, MASK_FNMADD_D,	m_op },
-	{ "fmadd.q",	"D,S,T,R", 	MATCH_FMADD_Q, MASK_FMADD_Q,	m_op },
-	{ "fmsub.q",	"D,S,T,R", 	MATCH_FMSUB_Q, MASK_FMSUB_Q,	m_op },
-	{ "fnmsub.q",	"D,S,T,R", 	MATCH_FNMSUB_Q, MASK_FNMSUB_Q,	m_op },
-	{ "fnmadd.q",	"D,S,T,R", 	MATCH_FNMADD_Q, MASK_FNMADD_Q,	m_op },
-	{ NULL, NULL, 0, 0, NULL },
-};
-
-static struct riscv_op riscv_c_opcodes[] = {
-	/* Aliases first */
-	{ "ret","",MATCH_C_JR | (X_RA << RD_SHIFT), MASK_C_JR | RD_MASK, m_op},
-
-	/* C-Compressed ISA Extension Instructions */
-	{ "c.nop",	"", 		MATCH_C_NOP, MASK_C_NOP,	m_op },
-	{ "c.ebreak",	"", 		MATCH_C_EBREAK, MASK_C_EBREAK,	m_op },
-	{ "c.jr",	"d", 		MATCH_C_JR, MASK_C_JR,		m_op },
-	{ "c.jalr",	"d", 		MATCH_C_JALR, MASK_C_JALR,	m_op },
-	{ "c.jal",	"Ca", 		MATCH_C_JAL, MASK_C_JAL,	m_op },
-	{ "c.ld",	"Ct,Cl(Cs)", 	MATCH_C_LD, MASK_C_LD,		m_op },
-	{ "c.sd",	"Ct,Cl(Cs)", 	MATCH_C_SD, MASK_C_SD,		m_op },
-	{ "c.addiw",	"d,Co", 	MATCH_C_ADDIW, MASK_C_ADDIW,	m_op },
-	{ "c.ldsp",	"d,Cn(Cc)", 	MATCH_C_LDSP, MASK_C_LDSP,	m_op },
-	{ "c.sdsp",	"CV,CN(Cc)", 	MATCH_C_SDSP, MASK_C_SDSP,	m_op },
-	{ "c.addi4spn",	"", 	MATCH_C_ADDI4SPN, MASK_C_ADDI4SPN,	m_op },
-	{ "c.addi16sp",	"", 	MATCH_C_ADDI16SP, MASK_C_ADDI16SP,	m_op },
-	{ "c.fld",	"CD,Cl(Cs)", 	MATCH_C_FLD, MASK_C_FLD,	m_op },
-	{ "c.lw",	"Ct,Ck(Cs)", 	MATCH_C_LW, MASK_C_LW,		m_op },
-	{ "c.flw",	"CD,Ck(Cs)", 	MATCH_C_FLW, MASK_C_FLW,	m_op },
-	{ "c.fsd",	"CD,Cl(Cs)", 	MATCH_C_FSD, MASK_C_FSD,	m_op },
-	{ "c.sw",	"Ct,Ck(Cs)", 	MATCH_C_SW, MASK_C_SW,		m_op },
-	{ "c.fsw",	"CD,Ck(Cs)", 	MATCH_C_FSW, MASK_C_FSW,	m_op },
-	{ "c.addi",	"d,Co", 	MATCH_C_ADDI, MASK_C_ADDI,	m_op },
-	{ "c.li",	"d,Co", 	MATCH_C_LI, MASK_C_LI,		m_op },
-	{ "c.lui",	"d,Cu", 	MATCH_C_LUI, MASK_C_LUI,	m_op },
-	{ "c.srli",	"Cs,C>", 	MATCH_C_SRLI, MASK_C_SRLI,	m_op },
-	{ "c.srai",	"Cs,C>", 	MATCH_C_SRAI, MASK_C_SRAI,	m_op },
-	{ "c.andi",	"Cs,Co", 	MATCH_C_ANDI, MASK_C_ANDI,	m_op },
-	{ "c.sub",	"Cs,Ct", 	MATCH_C_SUB, MASK_C_SUB,	m_op },
-	{ "c.xor",	"Cs,Ct", 	MATCH_C_XOR, MASK_C_XOR,	m_op },
-	{ "c.or",	"Cs,Ct", 	MATCH_C_OR, MASK_C_OR,		m_op },
-	{ "c.and",	"Cs,Ct", 	MATCH_C_AND, MASK_C_AND,	m_op },
-	{ "c.subw",	"Cs,Ct", 	MATCH_C_SUBW, MASK_C_SUBW,	m_op },
-	{ "c.addw",	"Cs,Ct", 	MATCH_C_ADDW, MASK_C_ADDW,	m_op },
-	{ "c.j",	"Ca", 		MATCH_C_J, MASK_C_J,		m_op },
-	{ "c.beqz",	"Cs,Cp", 	MATCH_C_BEQZ, MASK_C_BEQZ,	m_op },
-	{ "c.bnez",	"Cs,Cp", 	MATCH_C_BNEZ, MASK_C_BNEZ,	m_op },
-	{ "c.slli",	"d,C>", 	MATCH_C_SLLI, MASK_C_SLLI,	m_op },
-	{ "c.fldsp",	"D,Cn(Cc)", 	MATCH_C_FLDSP, MASK_C_FLDSP,	m_op },
-	{ "c.lwsp",	"d,Cm(Cc)", 	MATCH_C_LWSP, MASK_C_LWSP,	m_op },
-	{ "c.flwsp",	"D,Cm(Cc)", 	MATCH_C_FLWSP, MASK_C_FLWSP,	m_op },
-	{ "c.mv",	"d,CV", 	MATCH_C_MV, MASK_C_MV,		m_op },
-	{ "c.add",	"d,CV", 	MATCH_C_ADD, MASK_C_ADD,	m_op },
-	{ "c.fsdsp",	"CT,CN(Cc)", 	MATCH_C_FSDSP, MASK_C_FSDSP,	m_op },
-	{ "c.swsp",	"CV,CM(Cc)", 	MATCH_C_SWSP, MASK_C_SWSP,	m_op },
-	{ "c.fswsp",	"CT,CM(Cc)", 	MATCH_C_FSWSP, MASK_C_FSWSP,	m_op },
-	{ NULL, NULL, 0, 0, NULL },
-};
-
-static int
-oprint(struct riscv_op *op, vm_offset_t loc, int insn)
+static void
+print_imm(int imm, int bits)
 {
-	uint32_t rd, rs1, rs2, rs3;
-	uint32_t val;
-	const char *csr_name;
-	int imm;
-	char *p;
 
-	p = op->fmt;
+	db_printf("%d", sign_extend(imm, bits));
+}
 
-	rd = (insn & RD_MASK) >> RD_SHIFT;
-	rs1 = (insn & RS1_MASK) >> RS1_SHIFT;
-	rs2 = (insn & RS2_MASK) >> RS2_SHIFT;
+static void
+print_branch(vm_offset_t loc, int offset)
+{
 
-	db_printf("%s\t", op->name);
+	db_printf("0x%lx", loc + (offset << 2));
+}
 
-	while (*p) {
-		switch (*p) {
-		case 'C':	/* C-Compressed ISA extension */
-			switch (*++p) {
-			case 't':
-				rd = (insn >> 2) & 0x7;
-				rd += 0x8;
-				db_printf("%s", reg_name[rd]);
-				break;
-			case 's':
-				rs2 = (insn >> 7) & 0x7;
-				rs2 += 0x8;
-				db_printf("%s", reg_name[rs2]);
-				break;
-			case 'l':
-				imm = ((insn >> 10) & 0x7) << 3;
-				imm |= ((insn >> 5) & 0x3) << 6;
-				if (imm & (1 << 8))
-					imm |= 0xffffff << 8;
-				db_printf("%d", imm);
-				break;
-			case 'k':
-				imm = ((insn >> 10) & 0x7) << 3;
-				imm |= ((insn >> 6) & 0x1) << 2;
-				imm |= ((insn >> 5) & 0x1) << 6;
-				if (imm & (1 << 8))
-					imm |= 0xffffff << 8;
-				db_printf("%d", imm);
-				break;
-			case 'c':
-				db_printf("sp");
-				break;
-			case 'n':
-				imm = ((insn >> 5) & 0x3) << 3;
-				imm |= ((insn >> 12) & 0x1) << 5;
-				imm |= ((insn >> 2) & 0x7) << 6;
-				if (imm & (1 << 8))
-					imm |= 0xffffff << 8;
-				db_printf("%d", imm);
-				break;
-			case 'N':
-				imm = ((insn >> 10) & 0x7) << 3;
-				imm |= ((insn >> 7) & 0x7) << 6;
-				if (imm & (1 << 8))
-					imm |= 0xffffff << 8;
-				db_printf("%d", imm);
-				break;
-			case 'u':
-				imm = ((insn >> 2) & 0x1f) << 0;
-				imm |= ((insn >> 12) & 0x1) << 5;
-				if (imm & (1 << 5))
-					imm |= (0x7ffffff << 5); /* sign ext */
-				db_printf("0x%x", imm);
-				break;
-			case 'o':
-				imm = ((insn >> 2) & 0x1f) << 0;
-				imm |= ((insn >> 12) & 0x1) << 5;
-				if (imm & (1 << 5))
-					imm |= (0x7ffffff << 5); /* sign ext */
-				db_printf("%d", imm);
-				break;
-			case 'a':
-				/* imm[11|4|9:8|10|6|7|3:1|5] << 2 */
-				imm = ((insn >> 3) & 0x7) << 1;
-				imm |= ((insn >> 11) & 0x1) << 4;
-				imm |= ((insn >> 2) & 0x1) << 5;
-				imm |= ((insn >> 7) & 0x1) << 6;
-				imm |= ((insn >> 6) & 0x1) << 7;
-				imm |= ((insn >> 9) & 0x3) << 8;
-				imm |= ((insn >> 8) & 0x1) << 10;
-				imm |= ((insn >> 12) & 0x1) << 11;
-				if (imm & (1 << 11))
-					imm |= (0xfffff << 12);	/* sign ext */
-				db_printf("0x%lx", (loc + imm));
-				break;
-			case 'V':
-				rs2 = (insn >> 2) & 0x1f;
-				db_printf("%s", reg_name[rs2]);
-				break;
-			case '>':
-				imm = ((insn >> 2) & 0x1f) << 0;
-				imm |= ((insn >> 12) & 0x1) << 5;
-				db_printf("%d", imm);
-			};
-			break;
-		case 'd':
-			db_printf("%s", reg_name[rd]);
-			break;
-		case 'D':
-			db_printf("%s", fp_reg_name[rd]);
-			break;
-		case 's':
-			db_printf("%s", reg_name[rs1]);
-			break;
-		case 'S':
-			db_printf("%s", fp_reg_name[rs1]);
-			break;
-		case 't':
-			db_printf("%s", reg_name[rs2]);
-			break;
-		case 'T':
-			db_printf("%s", fp_reg_name[rs2]);
-			break;
-		case 'R':
-			rs3 = (insn >> 27) & 0x1f;
-			db_printf("%s", fp_reg_name[rs3]);
-			break;
-		case 'Z':
-			imm = (insn >> 15) & 0x1f;
-			db_printf("%d", imm);
-			break;
-		case 'p':
-			imm = ((insn >> 8) & 0xf) << 1;
-			imm |= ((insn >> 25) & 0x3f) << 5;
-			imm |= ((insn >> 7) & 0x1) << 11;
-			imm |= ((insn >> 31) & 0x1) << 12;
-			if (imm & (1 << 12))
-				imm |= (0xfffff << 12);	/* sign extend */
-			db_printf("0x%016lx", (loc + imm));
-			break;
-		case '(':
-		case ')':
-		case '[':
-		case ']':
-		case ',':
-			db_printf("%c", *p);
-			break;
-		case '0':
-			if (!p[1])
-				db_printf("%c", *p);
-			break;
-			
-		case 'o':
-			imm = (insn >> 20) & 0xfff;
-			if (imm & (1 << 11))
-				imm |= (0xfffff << 12);	/* sign extend */
-			db_printf("%d", imm);
-			break;
-		case 'q':
-			imm = (insn >> 7) & 0x1f;
-			imm |= ((insn >> 25) & 0x7f) << 5;
-			if (imm & (1 << 11))
-				imm |= (0xfffff << 12);	/* sign extend */
-			db_printf("%d", imm);
-			break;
-		case 'a':
-			/* imm[20|10:1|11|19:12] << 12 */
-			imm = ((insn >> 21) & 0x3ff) << 1;
-			imm |= ((insn >> 20) & 0x1) << 11;
-			imm |= ((insn >> 12) & 0xff) << 12;
-			imm |= ((insn >> 31) & 0x1) << 20;
-			if (imm & (1 << 20))
-				imm |= (0xfff << 20);	/* sign extend */
-			db_printf("0x%lx", (loc + imm));
-			break;
-		case 'u':
-			/* imm[31:12] << 12 */
-			imm = (insn >> 12) & 0xfffff;
-			if (imm & (1 << 20))
-				imm |= (0xfff << 20);	/* sign extend */
-			db_printf("0x%x", imm);
-			break;
-		case 'j':
-			/* imm[11:0] << 20 */
-			imm = (insn >> 20) & 0xfff;
-			if (imm & (1 << 11))
-				imm |= (0xfffff << 12); /* sign extend */
-			db_printf("%d", imm);
-			break;
-		case '>':
-			val = (insn >> 20) & 0x3f;
-			db_printf("0x%x", val);
-			break;
-		case '<':
-			val = (insn >> 20) & 0x1f;
-			db_printf("0x%x", val);
-			break;
-		case 'E':
-			val = (insn >> 20) & 0xfff;
-			csr_name = NULL;
-			switch (val) {
-#define DECLARE_CSR(name, num) case num: csr_name = #name; break;
-#include "machine/encoding.h"
-#undef DECLARE_CSR
-			}
-			if (csr_name)
-				db_printf("%s", csr_name);
-			else
-				db_printf("0x%x", val);
-			break;
-		case 'P':
-			if (insn & (1 << 27)) db_printf("i");
-			if (insn & (1 << 26)) db_printf("o");
-			if (insn & (1 << 25)) db_printf("r");
-			if (insn & (1 << 24)) db_printf("w");
-			break;
-		case 'Q':
-			if (insn & (1 << 23)) db_printf("i");
-			if (insn & (1 << 22)) db_printf("o");
-			if (insn & (1 << 21)) db_printf("r");
-			if (insn & (1 << 20)) db_printf("w");
+static void
+print_csr(uint32_t csr)
+{
+	const char *name;
+	static const struct {
+		uint32_t num;
+		const char *name;
+	} csr_names[] = {
+		{ 0x0, "crmd" },
+		{ 0x1, "prmd" },
+		{ 0x2, "euen" },
+		{ 0x3, "misc" },
+		{ 0x4, "ecfg" },
+		{ 0x5, "estat" },
+		{ 0x6, "era" },
+		{ 0x7, "badv" },
+		{ 0x8, "badi" },
+		{ 0xc, "eentry" },
+		{ 0x10, "tlbidx" },
+		{ 0x11, "tlbehi" },
+		{ 0x12, "tlbelo0" },
+		{ 0x13, "tlbelo1" },
+		{ 0x15, "gtlbc" },
+		{ 0x16, "trgp" },
+		{ 0x17, "asid" },
+		{ 0x18, "pgdl" },
+		{ 0x19, "pgdh" },
+		{ 0x1a, "pgd" },
+		{ 0x1b, "gpgdl" },
+		{ 0x1c, "gpgdh" },
+		{ 0x1d, "gpgd" },
+		{ 0x1e, "gpid" },
+		{ 0x1f, "gtoa" },
+		{ 0x20, "tlbrentry" },
+		{ 0x21, "tlbrbadv" },
+		{ 0x22, "tlbrera" },
+		{ 0x23, "tlbrsave" },
+		{ 0x24, "tlbrelo0" },
+		{ 0x25, "tlbrelo1" },
+		{ 0x26, "tlbrehi" },
+		{ 0x27, "tlbrprmd" },
+		{ 0x30, "dmw0" },
+		{ 0x31, "dmw1" },
+		{ 0x32, "dmw2" },
+		{ 0x33, "dmw3" },
+		{ 0x40, "tval" },
+		{ 0x41, "ticlr" },
+		{ 0x80, "llbctl" },
+		{ 0x81, "gllbctl" },
+		{ 0x88, "impctl1" },
+		{ 0x89, "impctl2" },
+		{ 0x90, "tlbrefill" },
+		{ 0x91, "gtlbrefill" },
+		{ 0x92, "htlbrefill" },
+		{ 0x93, "ftlbrefill" },
+		{ 0xa0, "pvctl" },
+		{ 0xa1, "vpid" },
+		{ 0xa2, "gstat" },
+		{ 0xa3, "gintc" },
+		{ 0, NULL }
+	};
+	int i;
+
+	name = NULL;
+	for (i = 0; csr_names[i].name != NULL; i++) {
+		if (csr_names[i].num == csr) {
+			name = csr_names[i].name;
 			break;
 		}
-
-		p++;
 	}
 
+	if (name != NULL)
+		db_printf("%s", name);
+	else
+		db_printf("0x%x", csr);
+}
+
+static int
+print_op(const struct loongarch_op *ops, uint32_t insn, vm_offset_t loc)
+{
+	const struct loongarch_op *op;
+	const char *fmt;
+	uint32_t rd, rj, rk, ra;
+	uint32_t fd, fj, fk, fa;
+	uint32_t imm;
+	int need_comma;
+
+	for (op = ops; op->name != NULL; op++) {
+		if ((insn & op->mask) == op->opcode) {
+			db_printf("%s\t", op->name);
+			fmt = op->fmt;
+			need_comma = 0;
+
+			/* Extract register fields */
+			rd = (insn & RD_MASK) >> RD_SHIFT;
+			rj = (insn & RJ_MASK) >> RJ_SHIFT;
+			rk = (insn & RK_MASK) >> RK_SHIFT;
+			ra = (insn & RA_MASK) >> RA_SHIFT;
+			fd = (insn & FD_MASK) >> FD_SHIFT;
+			fj = (insn & FJ_MASK) >> FJ_SHIFT;
+			fk = (insn & FK_MASK) >> FK_SHIFT;
+			fa = (insn & FA_MASK) >> FA_SHIFT;
+
+			while (*fmt) {
+				if (need_comma)
+					db_printf(", ");
+				need_comma = 1;
+
+				switch (*fmt) {
+				case 'd':
+					db_printf("%s", GPR_NAME(rd));
+					break;
+				case 'j':
+					db_printf("%s", GPR_NAME(rj));
+					break;
+				case 'k':
+					db_printf("%s", GPR_NAME(rk));
+					break;
+				case 'a':
+					db_printf("%s", GPR_NAME(ra));
+					break;
+				case 'D':
+					db_printf("%s", FPR_NAME(fd));
+					break;
+				case 'J':
+					db_printf("%s", FPR_NAME(fj));
+					break;
+				case 'K':
+					db_printf("%s", FPR_NAME(fk));
+					break;
+				case 'A':
+					db_printf("%s", FPR_NAME(fa));
+					break;
+				case 'i':
+					/* Check instruction type for immediate size */
+					/* break, syscall use 5-bit immediate (bits 6-10) */
+					if ((insn & 0x003fc000) == 0x002a0000 ||  /* break */
+					    (insn & 0x003fc000) == 0x002b0000) {  /* syscall */
+						imm = (insn >> 6) & 0x1f;
+						print_imm(imm, 5);
+					}
+					/* lu12i.w, lu32i.d use 20-bit immediate (bits 5-24) */
+					else if ((insn & 0xffc00000) == 0x0a000000 ||  /* lu12i.w */
+					         (insn & 0xffc00000) == 0x0b000000) {  /* lu32i.d */
+						imm = (insn >> 5) & 0xfffff;
+						print_imm(imm, 20);
+					} else {
+						/* 12-bit immediate for load/store (bits 10-21) */
+						imm = (insn >> 10) & 0xfff;
+						print_imm(imm, 12);
+					}
+					break;
+				case 'b':
+					if (op->opcode == 0x10000000 ||
+					    op->opcode == 0x14000000) {
+						/* b, bl: 26-bit offset */
+						imm = insn & 0x3ffffff;
+						print_branch(loc, sign_extend(imm, 26));
+					} else if (op->opcode == 0x08000000 ||
+					    op->opcode == 0x08200000) {
+						/* beqz, bnez: 21-bit offset */
+						imm = (insn >> IMM21_SHIFT) & 0x1fffff;
+						print_branch(loc, sign_extend(imm, 21));
+					} else {
+						/* Other branches: 16-bit offset */
+						imm = (insn >> IMM16_SHIFT) & 0xffff;
+						print_branch(loc, sign_extend(imm, 16));
+					}
+					break;
+				case 'c':
+					/* 14-bit CSR index (bits 10-23) */
+					imm = (insn >> 10) & 0x3fff;
+					print_csr(imm);
+					break;
+				default:
+					db_printf("?");
+					break;
+				}
+				fmt++;
+			}
+			return (1);
+		}
+	}
 	return (0);
 }
 
 vm_offset_t
 db_disasm(vm_offset_t loc, bool altfmt)
 {
-	struct riscv_op *op;
 	uint32_t insn;
-	int j;
 
 	insn = db_get_value(loc, 4, 0);
-	for (j = 0; riscv_opcodes[j].name != NULL; j++) {
-		op = &riscv_opcodes[j];
-		if (op->match_func(op, insn)) {
-			oprint(op, loc, insn);
-			return(loc + 4);
-		}
-	};
 
-	insn = db_get_value(loc, 2, 0);
-	for (j = 0; riscv_c_opcodes[j].name != NULL; j++) {
-		op = &riscv_c_opcodes[j];
-		if (op->match_func(op, insn)) {
-			oprint(op, loc, insn);
-			break;
-		}
-	};
+	/* Try each instruction group */
+	if (print_op(op_special, insn, loc))
+		goto done;
+	if (print_op(op_3r, insn, loc))
+		goto done;
+	if (print_op(op_2ri12, insn, loc))
+		goto done;
+	if (print_op(op_2ri16, insn, loc))
+		goto done;
+	if (print_op(op_1ri21, insn, loc))
+		goto done;
+	if (print_op(op_load_store, insn, loc))
+		goto done;
+	if (print_op(op_csr, insn, loc))
+		goto done;
+	if (print_op(op_iocsr, insn, loc))
+		goto done;
+	if (print_op(op_tlb, insn, loc))
+		goto done;
+	if (print_op(op_cache, insn, loc))
+		goto done;
+	if (print_op(op_fp, insn, loc))
+		goto done;
 
-	return(loc + 2);
+	/* Unknown instruction */
+	db_printf(".long\t0x%08x", insn);
+
+done:
+	db_printf("\n");
+	return (loc + 4);
 }

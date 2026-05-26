@@ -1,5 +1,8 @@
 /*-
  * Copyright (c) 2009 Alan L. Cox <alc@cs.rice.edu>
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,14 +31,12 @@
 #define	_MACHINE_VM_H_
 
 /* Memory attribute configuration. */
-#define	VM_MEMATTR_PMA		0
-#define	VM_MEMATTR_UNCACHEABLE	1
-#define	VM_MEMATTR_DEVICE	2
+#define	VM_MEMATTR_DEVICE		0
+#define	VM_MEMATTR_UNCACHEABLE		1
+#define	VM_MEMATTR_WRITE_BACK		2
+#define	VM_MEMATTR_WRITE_THROUGH	3
+#define	VM_MEMATTR_WRITE_COMBINING	VM_MEMATTR_WRITE_THROUGH
 
-#define	VM_MEMATTR_WRITE_BACK	VM_MEMATTR_PMA
-#define	VM_MEMATTR_DEFAULT	VM_MEMATTR_PMA
-
-#define	VM_MEMATTR_LAST		VM_MEMATTR_DEVICE
-#define	VM_MEMATTR_TOTAL	(VM_MEMATTR_LAST + 1)
+#define	VM_MEMATTR_DEFAULT		VM_MEMATTR_WRITE_BACK
 
 #endif /* !_MACHINE_VM_H_ */

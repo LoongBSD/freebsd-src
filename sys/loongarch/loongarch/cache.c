@@ -34,14 +34,12 @@
 
 #include <machine/cpufunc.h>
 
-struct riscv_cache_ops __read_frequently cache_ops;
-
-int64_t __read_frequently dcache_line_size;	/* The minimum D cache line size */
+struct loongarch_cache_ops __read_frequently cache_ops;
 
 static bool cache_initialized;
 
 void
-riscv_cache_install_hooks(struct riscv_cache_ops *newops, u_int line_size)
+loongarch_cache_install_hooks(struct loongarch_cache_ops *newops, u_int line_size)
 {
 	if (cache_initialized)
 		panic("cache hooks already installed!");

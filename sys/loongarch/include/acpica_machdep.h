@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2002 Mitsuru IWASAKI
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,36 +27,56 @@
 
 /******************************************************************************
  *
- * Name: acpica_machdep.h - arch-specific defines, etc.
- *       $Revision$
+ * Name: acpica_machdep.h - LoongArch-specific defines, etc.
  *
  *****************************************************************************/
 
-#ifndef __ACPICA_MACHDEP_H__
-#define	__ACPICA_MACHDEP_H__
+#ifndef __LOONGARCH_ACPICA_MACHDEP_H__
+#define	__LOONGARCH_ACPICA_MACHDEP_H__
 
 #ifdef _KERNEL
 
 #include <machine/_bus.h>
 
-/* Only use the reduced hardware model */
+/*
+ * LoongArch uses the ACPI Reduced Hardware Model.
+ * This simplifies the ACPI implementation by removing legacy hardware support.
+ */
 #define	ACPI_REDUCED_HARDWARE	1
 
-/* Section 5.2.10.1: global lock acquire/release functions */
+/*
+ * Section 5.2.10.1: global lock acquire/release functions
+ * These are required for ACPI Global Lock support.
+ */
 int	acpi_acquire_global_lock(volatile uint32_t *);
 int	acpi_release_global_lock(volatile uint32_t *);
 
+/*
+ * ACPI table mapping functions
+ */
 void	*acpi_map_table(vm_paddr_t pa, const char *sig);
 void	acpi_unmap_table(void *table);
 vm_paddr_t acpi_find_table(const char *sig);
 
+/*
+ * Generic Address Space (GAS) mapping
+ */
 struct acpi_generic_address;
 
-int	acpi_map_addr(struct acpi_generic_address  *, bus_space_tag_t *,
+int	acpi_map_addr(struct acpi_generic_address *, bus_space_tag_t *,
     bus_space_handle_t *, bus_size_t);
 
+/*
+ * Machine-dependent ACPI initialization
+ */
+int	acpi_machdep_init(device_t dev);
+int	acpi_machdep_quirks(int *quirks);
+
+/*
+ * NMI handler for APEI (Advanced Platform Error Interface)
+ */
 extern int (*apei_nmi)(void);
 
 #endif /* _KERNEL */
 
-#endif /* __ACPICA_MACHDEP_H__ */
+#endif /* __LOONGARCH_ACPICA_MACHDEP_H__ */

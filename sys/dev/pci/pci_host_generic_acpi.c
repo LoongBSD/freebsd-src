@@ -61,6 +61,10 @@
 #include <machine/bus.h>
 #include <machine/intr.h>
 
+#if defined(__loongarch__) && defined(__loongarch_lp64)
+#include "loongarch/acpica/acpi_pchmsi.h"
+#endif
+
 #include "pcib_if.h"
 #include "acpi_bus_if.h"
 
@@ -138,7 +142,7 @@ pci_host_generic_acpi_parse_resource(ACPI_RESOURCE *res, void *arg)
 {
 	device_t dev = (device_t)arg;
 	struct generic_pcie_acpi_softc *sc;
-	rman_res_t min, max, off;
+	rman_res_t min, max, off = 0;
 	int r, restype;
 
 	sc = device_get_softc(dev);
@@ -148,6 +152,7 @@ pci_host_generic_acpi_parse_resource(ACPI_RESOURCE *res, void *arg)
 		restype = res->Data.Address16.ResourceType;
 		min = res->Data.Address16.Address.Minimum;
 		max = res->Data.Address16.Address.Maximum;
+		off = res->Data.Address16.Address.TranslationOffset;
 		break;
 	case ACPI_RESOURCE_TYPE_ADDRESS32:
 		restype = res->Data.Address32.ResourceType;
@@ -380,7 +385,11 @@ generic_pcie_get_xref(device_t pci, device_t child)
 	err = pcib_get_id(pci, child, PCI_ID_RID, &rid);
 	if (err != 0)
 		return (ACPI_MSI_XREF);
+#if defined(__loongarch__) && defined(__loongarch_lp64)
+	err = acpi_pchmsi_map_pci_msi(sc->base.ecam, rid, &xref, &devid);
+#else
 	err = acpi_iort_map_pci_msi(sc->base.ecam, rid, &xref, &devid);
+#endif
 	if (err != 0)
 		return (ACPI_MSI_XREF);
 	return (xref);
@@ -398,17 +407,24 @@ generic_pcie_map_id(device_t pci, device_t child, uintptr_t *id)
 	err = pcib_get_id(pci, child, PCI_ID_RID, &rid);
 	if (err != 0)
 		return (err);
-        err = acpi_iort_map_pci_msi(sc->base.ecam, rid, &xref, &devid);
+#if defined(__loongarch__) && defined(__loongarch_lp64)
+	err = acpi_pchmsi_map_pci_msi(sc->base.ecam, rid, &xref, &devid);
+#else
+	err = acpi_iort_map_pci_msi(sc->base.ecam, rid, &xref, &devid);
+#endif
 	if (err == 0)
 		*id = devid;
 	else
-		*id = rid;	/* RID not in IORT, likely FW bug, ignore */
+		*id = rid;
 	return (0);
 }
 
 static int
 generic_pcie_get_iommu(device_t pci, device_t child, uintptr_t *id)
 {
+#if defined(__loongarch__) && defined(__loongarch_lp64)
+	return (ENOENT);
+#else
 	struct generic_pcie_acpi_softc *sc;
 	struct pci_id_ofw_iommu *iommu;
 	uint64_t iommu_xref;
@@ -430,16 +446,20 @@ generic_pcie_get_iommu(device_t pci, device_t child, uintptr_t *id)
 	}
 
 	return (err);
+#endif
 }
 
 static int
 generic_pcie_acpi_alloc_msi(device_t pci, device_t child, int count,
     int maxcount, int *irqs)
 {
+	u_int xref;
 
 #if defined(INTRNG)
-	return (intr_alloc_msi(pci, child, generic_pcie_get_xref(pci, child),
-	    count, maxcount, irqs));
+	xref = generic_pcie_get_xref(pci, child);
+	printf("DEBUG: generic_pcie_acpi_alloc_msi: child=%s, xref=%u, count=%d, maxcount=%d\n",
+	    device_get_nameunit(child), xref, count, maxcount);
+	return (intr_alloc_msi(pci, child, xref, count, maxcount, irqs));
 #else
 	return (ENXIO);
 #endif
@@ -464,6 +484,8 @@ generic_pcie_acpi_map_msi(device_t pci, device_t child, int irq, uint64_t *addr,
 {
 
 #if defined(INTRNG)
+	printf("DEBUG: generic_pcie_acpi_map_msi: child=%s, irq=%d\n",
+	    device_get_nameunit(child), irq);
 	return (intr_map_msi(pci, child, generic_pcie_get_xref(pci, child), irq,
 	    addr, data));
 #else
@@ -476,6 +498,8 @@ generic_pcie_acpi_alloc_msix(device_t pci, device_t child, int *irq)
 {
 
 #if defined(INTRNG)
+	printf("DEBUG: generic_pcie_acpi_alloc_msix: child=%s\n",
+	    device_get_nameunit(child));
 	return (intr_alloc_msix(pci, child, generic_pcie_get_xref(pci, child),
 	    irq));
 #else

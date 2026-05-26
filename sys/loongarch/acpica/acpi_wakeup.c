@@ -1,8 +1,6 @@
 /*-
- * Copyright (c) 2015 The FreeBSD Foundation
- *
- * This software was developed by Andrew Turner under
- * sponsorship from the FreeBSD Foundation.
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,9 +32,6 @@
 
 #include <dev/acpica/acpivar.h>
 
-/*
- * ARM64TODO: Implement this.
- */
 int
 acpi_sleep_machdep(struct acpi_softc *sc, int state)
 {
@@ -49,7 +44,6 @@ acpi_wakeup_machdep(struct acpi_softc *sc, int state, int sleep_result,
     int intr_enabled)
 {
 
-	/* ARM64TODO: We will need this with acpi_sleep_machdep */
 	KASSERT(sleep_result == -1,
 	    ("acpi_wakeup_machdep: Invalid sleep result"));
 

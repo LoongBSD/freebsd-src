@@ -65,7 +65,7 @@ static void
 configure_first(void *dummy)
 {
 
-	/* nexus0 is the top of the riscv device tree */
+	/* nexus0 is the top of the loongarch device tree */
 	device_add_child(root_bus, "nexus", 0);
 }
 
@@ -81,6 +81,7 @@ static void
 configure_final(void *dummy)
 {
 
+	/* Enable interrupts */
 	intr_enable();
 
 	cninit_finish();

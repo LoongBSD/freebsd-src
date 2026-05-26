@@ -1,5 +1,8 @@
 /*-
  * Copyright (c) 2015-2016 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -38,19 +41,22 @@
 #include <sys/_types.h>
 
 struct reg {
-	__uint64_t	ra;		/* return address */
-	__uint64_t	sp;		/* stack pointer */
-	__uint64_t	gp;		/* global pointer */
-	__uint64_t	tp;		/* thread pointer */
-	__uint64_t	t[7];		/* temporaries */
-	__uint64_t	s[12];		/* saved registers */
-	__uint64_t	a[8];		/* function arguments */
-	__uint64_t	sepc;		/* exception program counter */
-	__uint64_t	sstatus;	/* status register */
+	__uint64_t	regs[32];		/* general purpose register */
+
+  /* Special CSR register */
+	__uint64_t	crmd;
+	__uint64_t	prmd;
+	__uint64_t	euen;
+	__uint64_t	misc;
+	__uint64_t	ecfg;
+	__uint64_t	estat;
+	__uint64_t	era;
+	__uint64_t	badvaddr;
+	__uint64_t	orig_a0;
 };
 
 struct fpreg {
-	__uint64_t	fp_x[32][2];	/* Floating point registers */
+	__uint64_t	fp_regs[34];	/* Floating point registers */
 	__uint64_t	fp_fcsr;	/* Floating point control reg */
 };
 

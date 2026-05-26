@@ -1,0 +1,255 @@
+# FreeBSD/loongarch64 ACPI 支持实现文档
+
+## 概述
+
+本文档描述了为 FreeBSD/loongarch64 平台实现 ACPI 支持的基础工作。
+当前实现提供了 ACPI 子系统运行所需的最小 OS 层接口。
+
+## 已实现的文件
+
+### 1. sys/loongarch/acpica/OsdEnvironment.c
+
+**功能：** ACPI OS 服务层实现
+
+**核心函数：**
+- `AcpiOsInitialize()` - 初始化 OS 层
+- `AcpiOsTerminate()` - 终止 OS 层
+- `AcpiOsGetRootPointer()` - 获取 RSDP 物理地址
+- `AcpiOsMapMemory()` - 映射物理内存到虚拟地址
+- `AcpiOsUnmapMemory()` - 取消映射内存
+- `AcpiOsGetPhysicalAddress()` - 获取物理地址
+
+**RSDP 获取机制：**
+1. 优先从 loader tunable (`acpi.rsdp`) 获取
+2. 从 EFI 配置表获取（ACPI 2.0 或 ACPI 1.0）
+3. 回退到 legacy resource hints
+
+### 2. sys/loongarch/acpica/acpi_machdep.c
+
+**功能：** 机器相关 ACPI 支持
+
+**核心函数：**
+- `acpi_machdep_init()` - 机器相关初始化
+- `acpi_machdep_quirks()` - 获取平台 quirks
+- `acpi_acquire_global_lock()` - 获取 ACPI 全局锁
+- `acpi_release_global_lock()` - 释放 ACPI 全局锁
+- `acpi_map_table()` - 映射 ACPI 表
+- `acpi_unmap_table()` - 取消映射 ACPI 表
+- `acpi_find_table()` - 查找 ACPI 表
+- `acpi_map_addr()` - 映射 GAS 地址
+
+**特性：**
+- 支持 ACPI Reduced Hardware Model
+- 通过 XSDT 查找 ACPI 表（ACPI 2.0+）
+- 支持 RSDT 回退（ACPI 1.0 兼容）
+- 自动验证表签名和校验和
+
+### 3. sys/loongarch/include/acpica_machdep.h
+
+**功能：** LoongArch 特定 ACPI 定义
+
+**关键定义：**
+```c
+#define ACPI_REDUCED_HARDWARE 1
+```
+
+**声明的接口：**
+- 全局锁操作函数
+- 表映射函数
+- GAS 地址映射
+- 机器相关初始化
+
+### 4. sys/sys/efi.h (更新)
+
+**新增定义：**
+```c
+#define EFI_TABLE_ACPI    /* ACPI 1.0 RSDP GUID */
+#define EFI_TABLE_ACPI20  /* ACPI 2.0+ RSDP GUID */
+```
+
+### 5. sys/conf/files.loongarch (更新)
+
+**添加的 ACPI 文件：**
+```
+dev/acpica/acpi_bus_if.m		optional	acpi
+dev/acpica/acpi_if.m			optional	acpi
+loongarch/acpica/acpi_machdep.c		optional	acpi
+loongarch/acpica/OsdEnvironment.c	optional	acpi
+```
+
+### 6. sys/conf/options.loongarch (更新)
+
+**添加的选项：**
+```
+ACPI				opt_global.h
+ACPI_DEBUG			opt_acpi.h
+```
+
+### 7. sys/loongarch/conf/GENERIC (更新)
+
+**添加的配置（默认注释）：**
+```
+#options 	ACPI
+#device 	acpi
+```
+
+## 架构设计
+
+### 内存映射
+
+LoongArch 使用 DMAP 区域进行物理到虚拟地址的映射：
+
+```
+pmap_mapbios() → PHYS_TO_DMAP()
+```
+
+这种方式适用于：
+- ACPI 表访问
+- MMIO 区域访问
+- 运行时服务调用
+
+### 中断模型
+
+LoongArch 使用独特的中断控制器：
+- **EIOINTC**：扩展 I/O 中断控制器
+- **PCH_PIC**：PCIe Host Controller PIC
+
+ACPI 中断路由需要通过 MADT 表解析这些控制器。
+
+### Reduced Hardware Model
+
+LoongArch 采用 ACPI Reduced Hardware Model，这意味着：
+- 不支持传统电源管理寄存器
+- 使用 PSCI 进行 CPU 电源管理
+- 简化的睡眠/唤醒机制
+
+## 编译配置
+
+### 启用 ACPI 支持
+
+在内核配置文件中添加：
+
+```
+options 	ACPI
+device 	acpi
+```
+
+### 启动参数
+
+```
+# 指定 RSDP 物理地址
+acpi.rsdp="0x8f00000"
+
+# 禁用 ACPI（回退到 FDT）
+acpi.disable=1
+
+# 启用 ACPI 调试输出
+debug.acpi.verbose=1
+```
+
+## 测试方法
+
+### 1. 基本验证
+
+```bash
+# 检查 ACPI 是否启用
+sysctl machdep.acpi_root
+
+# 查看 ACPI 表信息
+acpidump -t
+
+# 显示 ACPI 调试信息（需要在内核中启用 ACPI_DEBUG）
+```
+
+### 2. 中断验证
+
+```bash
+# 显示中断统计
+vmstat -i
+
+# 检查中断控制器状态
+```
+
+### 3. 设备枚举
+
+```bash
+# 查看 ACPI 设备树
+devinfo -v
+```
+
+## 待完成的工作
+
+### 高优先级
+
+1. **MADT 解析支持**
+   - 实现 EIOINTC ACPI 驱动
+   - 实现 PCH_PIC ACPI 驱动
+   - 解析 LoongArch 特定的 MADT 子表
+
+2. **PCI/PCIe ACPI 支持**
+   - 实现 PCI 配置空间 ECAM 访问
+   - 解析 MCFG 表
+   - 实现 PCI 根桥 ACPI 驱动
+
+3. **UART ACPI 支持**
+   - 解析 SPCR 表
+   - 支持 ACPI 控制台
+
+### 中优先级
+
+4. **定时器 ACPI 支持**
+   - 解析 GTDT 表
+   - 支持 ACPI 定时器
+
+5. **GPIO/I2C/SPI 驱动 ACPI 绑定**
+
+6. **电源管理**
+   - 支持 S3/S4 睡眠状态
+   - 实现唤醒设备管理
+
+### 低优先级
+
+7. **性能优化**
+   - 优化表映射缓存
+   - 减少内存拷贝
+
+8. **错误处理**
+   - 实现 APEI（ACPI Platform Error Interface）
+   - 支持 BERT/ERST/HEST 表
+
+## 已知限制
+
+1. **仅支持 ACPI 2.0+**
+   - 虽然代码包含 ACPI 1.0 回退，但 LoongArch 平台应使用 ACPI 2.0+
+
+2. **依赖 EFI 启动**
+   - 当前实现假设通过 EFI 启动
+   - 需要支持传统固件启动方式
+
+3. **SMP 支持不完整**
+   - MADT 处理器枚举已实现基础框架
+   - 需要完整的 CPU hotplug 支持
+
+## 参考资料
+
+### 规范文档
+- ACPI Specification 6.4: https://uefi.org/specifications
+- LoongArch 架构手册
+
+### 代码参考
+- FreeBSD/arm64 ACPI 实现
+- Linux/loongarch ACPI 支持
+- ACPICA 源代码
+
+### 调试工具
+- `acpidump` - 转储 ACPI 表
+- `iasl` - ACPI 表编译器/反编译器
+- `devinfo` - 设备信息查询
+
+## 贡献者
+
+- Haowu Ge <gehaowu@bitmoe.com> - 初始实现
+
+## 许可证
+
+本实现遵循 FreeBSD 许可证（BSD 2-Clause）。

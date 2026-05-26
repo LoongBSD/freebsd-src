@@ -1,6 +1,8 @@
 /*-
  * Copyright (c) 2014 Andrew Turner
  * Copyright (c) 2015 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -39,6 +41,7 @@
 #include <vm/vm.h>
 #include <vm/pmap.h>
 
+#include <machine/atomic.h>
 #include <machine/bus.h>
 
 uint8_t  generic_bs_r_1(void *, bus_space_handle_t, bus_size_t);
@@ -111,6 +114,35 @@ static void
 generic_bs_barrier(void *t, bus_space_handle_t bsh, bus_size_t offset,
     bus_size_t size, int flags)
 {
+
+	/*
+	 * Ensure memory operations complete before/after MMIO accesses.
+	 * 
+	 * For write barrier: ensure all previous writes are visible before
+	 * MMIO writes reach the device. This is critical for PCI MMIO ordering.
+	 * 
+	 * For read barrier: ensure MMIO reads complete before subsequent
+	 * memory reads.
+	 */
+	if (flags & BUS_SPACE_BARRIER_WRITE) {
+		/*
+		 * Write barrier: dbar 0x18 = ordering + prev_write -> succ_read+write
+		 * Bit4=1 (ordering), Bit3=1 (no prev read), Bit2=0 (prev write),
+		 * Bit1=0 (succ read), Bit0=0 (succ write).
+		 * Ensures previous writes are visible before subsequent MMIO
+		 * reads and writes reach the device.
+		 */
+		dbar(0x18);
+	}
+	if (flags & BUS_SPACE_BARRIER_READ) {
+		/*
+		 * Read barrier: dbar 0x14 = ordering + prev_read -> succ_read+write
+		 * Bit4=1 (ordering), Bit3=0 (prev read), Bit2=1 (no prev write),
+		 * Bit1=0 (succ read), Bit0=0 (succ write).
+		 * Ensures MMIO reads complete before subsequent memory operations.
+		 */
+		dbar(0x14);
+	}
 }
 
 static int

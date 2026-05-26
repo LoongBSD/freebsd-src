@@ -3250,6 +3250,12 @@ sigprocess(struct thread *td, int sig)
 				(u_long)p->p_pid, sig);
 #endif
 			return (SIGSTATUS_IGNORE);
+			panic("init got signal %d at era=%lx, badv=%lx, sp=%lx, ra=%lx",
+			    sig,
+			    td->td_frame->tf_era,
+			    td->td_frame->tf_badvaddr,
+			    td->td_frame->tf_sp,
+			    td->td_frame->tf_ra);
 		}
 
 		/*

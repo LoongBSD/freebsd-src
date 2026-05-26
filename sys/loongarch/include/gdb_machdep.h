@@ -2,6 +2,9 @@
  * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 Mitchell Horne <mhorne@FreeBSD.org>
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,20 +36,17 @@
 #define	GDB_NREGS		33
 #define	GDB_REG_ZERO		0
 #define	GDB_REG_RA		1
-#define	GDB_REG_SP		2
-#define	GDB_REG_GP		3
-#define	GDB_REG_TP		4
-#define	GDB_REG_T0		5
-#define	GDB_REG_FP		8
-#define	GDB_REG_S1		9
-#define	GDB_REG_A0		10
-#define	GDB_REG_S2		18
-#define	GDB_REG_T3		28
+#define	GDB_REG_TP		2
+#define	GDB_REG_SP		3
+#define	GDB_REG_A0		4
+#define	GDB_REG_T0		12
+#define	GDB_REG_FP		22
+#define	GDB_REG_S0		23
 #define	GDB_REG_PC		32
 #define	GDB_REG_CSR_BASE	65
-#define	GDB_REG_SSTATUS		(GDB_REG_CSR_BASE + 0x100)
-#define	GDB_REG_SCAUSE		(GDB_REG_CSR_BASE + 0x142)
-#define	GDB_REG_STVAL		(GDB_REG_CSR_BASE + 0x143)
+#define	GDB_REG_CRMD		(GDB_REG_CSR_BASE + 0x0)
+#define	GDB_REG_PRMD		(GDB_REG_CSR_BASE + 0x1)
+#define	GDB_REG_ESTAT		(GDB_REG_CSR_BASE + 0x5)
 _Static_assert(GDB_BUFSZ >= (GDB_NREGS * 8), "buffer fits 'g' regs");
 
 static __inline size_t

@@ -30,7 +30,7 @@
  */
 
 /*
- * Architecture specific syscalls (RISC-V)
+ * Architecture specific syscalls (LoongArch)
  */
 #ifndef _MACHINE_SYSARCH_H_
 #define	_MACHINE_SYSARCH_H_

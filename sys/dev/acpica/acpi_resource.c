@@ -545,6 +545,14 @@ acpi_parse_resources(device_t dev, ACPI_HANDLE handle,
     if (acpi_MatchHid(handle, "APMC0D0F") != ACPI_MATCHHID_NOMATCH)
 	    arc.ignore_producer_flag = true;
 
+    /*
+     * QEMU's aml_qword_memory() does not set the Consumer/Producer flag,
+     * so it defaults to Producer (0).  On LoongArch, the UART uses
+     * QWORD memory resources, so PNP0501 devices need this workaround.
+     */
+    if (acpi_MatchHid(handle, "PNP0501") != ACPI_MATCHHID_NOMATCH)
+	    arc.ignore_producer_flag = true;
+
     status = AcpiWalkResources(handle, "_CRS", acpi_parse_resource, &arc);
     if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
 	printf("can't fetch resources for %s - %s\n",

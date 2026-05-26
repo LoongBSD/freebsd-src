@@ -143,6 +143,18 @@ ofwbus_alloc_resource(device_t bus, device_t child, int type, int *rid,
 	if (!passthrough && isdefault) {
 		rle = resource_list_find(BUS_GET_RESOURCE_LIST(bus, child),
 		    type, *rid);
+		/*
+		 * For architectures that use memory-mapped I/O (like ARM64,
+		 * RISC-V, and LoongArch), SYS_RES_IOPORT may be requested
+		 * but the device tree only defines SYS_RES_MEMORY. Fall back
+		 * to SYS_RES_MEMORY if SYS_RES_IOPORT is not found.
+		 */
+		if (rle == NULL && type == SYS_RES_IOPORT) {
+			rle = resource_list_find(BUS_GET_RESOURCE_LIST(bus, child),
+			    SYS_RES_MEMORY, *rid);
+			if (rle != NULL)
+				type = SYS_RES_MEMORY;
+		}
 		if (rle == NULL) {
 			if (bootverbose)
 				device_printf(bus, "no default resources for "

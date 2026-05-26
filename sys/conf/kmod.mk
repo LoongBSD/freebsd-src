@@ -161,12 +161,13 @@ LDFLAGS+=	--build-id=sha1
 
 CFLAGS+=	${DEBUG_FLAGS}
 .if ${MACHINE_CPUARCH} == aarch64 || ${MACHINE_CPUARCH} == amd64 || \
-    ${MACHINE_CPUARCH} == riscv
+    ${MACHINE_CPUARCH} == riscv || ${MACHINE_CPUARCH} == loongarch
 CFLAGS+=	-fno-omit-frame-pointer -mno-omit-leaf-frame-pointer
 .endif
 
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "riscv" || \
-    ${MACHINE_CPUARCH} == "powerpc" || ${MACHINE_CPUARCH} == "i386"
+    ${MACHINE_CPUARCH} == "powerpc" || ${MACHINE_CPUARCH} == "i386" || \
+    ${MACHINE_CPUARCH} == "loongarch"
 CFLAGS+=	-fPIC
 .endif
 
@@ -307,11 +308,11 @@ beforebuild: ${_ILINKS}
 PREFIX_SYSDIR=/usr/src/sys
 CFLAGS+= -ffile-prefix-map=${SYSDIR}=${PREFIX_SYSDIR}
 .if defined(KERNBUILDDIR)
-PREFIX_KERNBUILDDIR=/usr/obj/usr/src/${MACHINE}.${MACHINE_CPUARCH}/sys/${KERNBUILDDIR:T}
+PREFIX_KERNBUILDDIR=/usr/obj/usr/src/${MACHINE}.${MACHINE_ARCH}/sys/${KERNBUILDDIR:T}
 PREFIX_OBJDIR=${PREFIX_KERNBUILDDIR}/modules/usr/src/sys/modules/${.OBJDIR:T}
 CFLAGS+= -ffile-prefix-map=${KERNBUILDDIR}=${PREFIX_KERNBUILDDIR}
 .else
-PREFIX_OBJDIR=/usr/obj/usr/src/${MACHINE}.${MACHINE_CPUARCH}/sys/modules/${.OBJDIR:T}
+PREFIX_OBJDIR=/usr/obj/usr/src/${MACHINE}.${MACHINE_ARCH}/sys/modules/${.OBJDIR:T}
 .endif
 CFLAGS+= -ffile-prefix-map=${.OBJDIR}=${PREFIX_OBJDIR}
 .if defined(SYSROOT)

@@ -79,6 +79,11 @@
 #  define LG_VADDR		48
 #  define LG_SIZEOF_PTR		3
 #endif
+#ifdef __loongarch__
+#  define LG_VADDR		48
+#  define LG_SIZEOF_PTR		3
+#  define JEMALLOC_TLS_MODEL	__attribute__((tls_model("initial-exec")))
+#endif
 
 #if LG_VADDR > 32
 #  define JEMALLOC_RETAIN

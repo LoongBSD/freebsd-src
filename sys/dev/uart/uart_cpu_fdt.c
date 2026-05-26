@@ -80,12 +80,16 @@ uart_cpu_getdev(int devtype, struct uart_devinfo *di)
 
 	/* Allow overriding the FDT using the environment. */
 	class = &uart_ns8250_class;
+	*(volatile uint8_t *)0x800000001FE001E0UL = '1';
 	err = uart_getenv(devtype, di, class);
+	*(volatile uint8_t *)0x800000001FE001E0UL = 's';
 	if (err == 0)
 		return (0);
 
+	*(volatile uint8_t *)0x800000001FE001E0UL = 'u';
 	err = uart_cpu_fdt_probe(&class, &bst, &bsh, &br, &rclk,
 	    &shift, &iowidth, devtype);
+	*(volatile uint8_t *)0x800000001FE001E0UL = 't';
 	if (err != 0)
 		return (err);
 

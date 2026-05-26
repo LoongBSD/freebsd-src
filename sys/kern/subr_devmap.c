@@ -37,7 +37,7 @@
 #include <vm/pmap.h>
 #include <machine/vmparam.h>
 
-#ifdef __arm__
+#if defined(__arm__) || (defined(__loongarch__) && defined(__loongarch_lp64))
 #include <machine/pte.h>
 #endif
 
@@ -59,7 +59,7 @@ static u_int			akva_devmap_idx;
 #endif
 static vm_offset_t		akva_devmap_vaddr = DEVMAP_MAX_VADDR;
 
-#if defined(__aarch64__) || defined(__riscv)
+#if defined(__aarch64__) || (defined(__loongarch__) && defined(__loongarch_lp64)) || defined(__riscv)
 extern int early_boot;
 #endif
 

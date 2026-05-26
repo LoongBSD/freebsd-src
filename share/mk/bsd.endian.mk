@@ -4,6 +4,7 @@
     ${MACHINE_ARCH} == "amd64" || \
     ${MACHINE_ARCH} == "i386" || \
     ${MACHINE_ARCH} == "powerpc64le" || \
+    ${MACHINE_ARCH} == "loongarch64" || \
     ${MACHINE_CPUARCH} == "riscv"
 TARGET_ENDIANNESS= 1234
 CAP_MKDB_ENDIAN= -l

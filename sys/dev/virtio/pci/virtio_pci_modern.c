@@ -188,7 +188,7 @@ static void	vtpci_modern_write_device_8(struct vtpci_modern_softc *,
 		    bus_size_t, uint64_t);
 
 /* Tunables. */
-static int vtpci_modern_transitional = 0;
+static int vtpci_modern_transitional = 1;
 TUNABLE_INT("hw.virtio.pci.transitional", &vtpci_modern_transitional);
 
 static device_method_t vtpci_modern_methods[] = {
@@ -1293,6 +1293,9 @@ vtpci_modern_enable_virtqueues(struct vtpci_modern_softc *sc)
 	int idx;
 
 	for (idx = 0; idx < sc->vtpci_common.vtpci_nvqs; idx++) {
+		device_printf(sc->vtpci_dev,
+		    "DEBUG: enable_vq idx=%d, Q_ENABLE offset=%d\n",
+		    idx, VIRTIO_PCI_COMMON_Q_ENABLE);
 		vtpci_modern_select_virtqueue(sc, idx);
 		vtpci_modern_write_common_2(sc, VIRTIO_PCI_COMMON_Q_ENABLE, 1);
 	}
@@ -1329,6 +1332,9 @@ static void
 vtpci_modern_write_common_2(struct vtpci_modern_softc *sc, bus_size_t off,
     uint16_t val)
 {
+	device_printf(sc->vtpci_dev,
+	    "DEBUG: write_common_2 off=%lu, val=%u (0x%x)\n",
+	    (u_long)off, val, val);
 	bus_write_2(&sc->vtpci_common_res_map.vtrm_map,
 			off, virtio_gtoh16(true, val));
 }

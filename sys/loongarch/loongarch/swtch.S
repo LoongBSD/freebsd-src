@@ -1,5 +1,7 @@
 /*-
  * Copyright (c) 2015-2017 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -37,104 +39,101 @@
 
 #include <machine/param.h>
 #include <machine/asm.h>
-#include <machine/riscvreg.h>
+#include <machine/loongarchreg.h>
 #include <machine/pte.h>
+#include <machine/trap.h>
+
+.macro EX inst, reg, src, offset
+	li.d	$t0, \offset
+	\inst \reg, \src, $t0
+.endm
+
 .macro __fpe_state_save p
-	/*
-	 * Enable FPE usage in supervisor mode,
-	 * so we can access registers.
-	 */
-	li	t0, SSTATUS_FS_INITIAL
-	csrs	sstatus, t0
 
 	/* Store registers */
-	frcsr	t0
-	sd	t0, (PCB_FCSR)(\p)
-	fsd	f0, (PCB_X + 0 * 16)(\p)
-	fsd	f1, (PCB_X + 1 * 16)(\p)
-	fsd	f2, (PCB_X + 2 * 16)(\p)
-	fsd	f3, (PCB_X + 3 * 16)(\p)
-	fsd	f4, (PCB_X + 4 * 16)(\p)
-	fsd	f5, (PCB_X + 5 * 16)(\p)
-	fsd	f6, (PCB_X + 6 * 16)(\p)
-	fsd	f7, (PCB_X + 7 * 16)(\p)
-	fsd	f8, (PCB_X + 8 * 16)(\p)
-	fsd	f9, (PCB_X + 9 * 16)(\p)
-	fsd	f10, (PCB_X + 10 * 16)(\p)
-	fsd	f11, (PCB_X + 11 * 16)(\p)
-	fsd	f12, (PCB_X + 12 * 16)(\p)
-	fsd	f13, (PCB_X + 13 * 16)(\p)
-	fsd	f14, (PCB_X + 14 * 16)(\p)
-	fsd	f15, (PCB_X + 15 * 16)(\p)
-	fsd	f16, (PCB_X + 16 * 16)(\p)
-	fsd	f17, (PCB_X + 17 * 16)(\p)
-	fsd	f18, (PCB_X + 18 * 16)(\p)
-	fsd	f19, (PCB_X + 19 * 16)(\p)
-	fsd	f20, (PCB_X + 20 * 16)(\p)
-	fsd	f21, (PCB_X + 21 * 16)(\p)
-	fsd	f22, (PCB_X + 22 * 16)(\p)
-	fsd	f23, (PCB_X + 23 * 16)(\p)
-	fsd	f24, (PCB_X + 24 * 16)(\p)
-	fsd	f25, (PCB_X + 25 * 16)(\p)
-	fsd	f26, (PCB_X + 26 * 16)(\p)
-	fsd	f27, (PCB_X + 27 * 16)(\p)
-	fsd	f28, (PCB_X + 28 * 16)(\p)
-	fsd	f29, (PCB_X + 29 * 16)(\p)
-	fsd	f30, (PCB_X + 30 * 16)(\p)
-	fsd	f31, (PCB_X + 31 * 16)(\p)
+	EX fstx.d, $fa0, \p, (PCB_F + 0 * RSIZE)
+	EX fstx.d, $fa1, \p, (PCB_F + 1 * RSIZE)
+	EX fstx.d, $fa2, \p, (PCB_F + 2 * RSIZE)
+	EX fstx.d, $fa3, \p, (PCB_F + 3 * RSIZE)
+	EX fstx.d, $fa4, \p, (PCB_F + 4 * RSIZE)
+	EX fstx.d, $fa5, \p, (PCB_F + 5 * RSIZE)
+	EX fstx.d, $fa6, \p, (PCB_F + 6 * RSIZE)
+	EX fstx.d, $fa7, \p, (PCB_F + 7 * RSIZE)
 
-	/* Disable FPE usage in supervisor mode. */
-	li	t0, SSTATUS_FS_MASK
-	csrc	sstatus, t0
+	EX fstx.d, $ft0, \p, (PCB_F + 8 * RSIZE)
+	EX fstx.d, $ft1, \p, (PCB_F + 9 * RSIZE)
+	EX fstx.d, $ft2, \p, (PCB_F + 10 * RSIZE)
+	EX fstx.d, $ft3, \p, (PCB_F + 11 * RSIZE)
+	EX fstx.d, $ft4, \p, (PCB_F + 12 * RSIZE)
+	EX fstx.d, $ft5, \p, (PCB_F + 13 * RSIZE)
+	EX fstx.d, $ft6, \p, (PCB_F + 14 * RSIZE)
+	EX fstx.d, $ft7, \p, (PCB_F + 15 * RSIZE)
+	EX fstx.d, $ft8, \p, (PCB_F + 16 * RSIZE)
+	EX fstx.d, $ft9, \p, (PCB_F + 17 * RSIZE)
+	EX fstx.d, $ft10, \p, (PCB_F + 18 * RSIZE)
+	EX fstx.d, $ft11, \p, (PCB_F + 19 * RSIZE)
+	EX fstx.d, $ft12, \p, (PCB_F + 20 * RSIZE)
+	EX fstx.d, $ft13, \p, (PCB_F + 21 * RSIZE)
+	EX fstx.d, $ft14, \p, (PCB_F + 22 * RSIZE)
+	EX fstx.d, $ft15, \p, (PCB_F + 23 * RSIZE)
+
+	EX fstx.d, $fs0, \p, (PCB_F + 24 * RSIZE)
+	EX fstx.d, $fs1, \p, (PCB_F + 25 * RSIZE)
+	EX fstx.d, $fs2, \p, (PCB_F + 26 * RSIZE)
+	EX fstx.d, $fs3, \p, (PCB_F + 27 * RSIZE)
+	EX fstx.d, $fs4, \p, (PCB_F + 28 * RSIZE)
+	EX fstx.d, $fs5, \p, (PCB_F + 29 * RSIZE)
+	EX fstx.d, $fs6, \p, (PCB_F + 30 * RSIZE)
+	EX fstx.d, $fs7, \p, (PCB_F + 31 * RSIZE)
+
+	movfcsr2gr  $t1, $fcsr0
+	li.d	$t0, (PCB_F + 32 * RSIZE)
+	stx.d	$t1, \p, $t0
+
 .endm
 
 .macro __fpe_state_load p
-	/*
-	 * Enable FPE usage in supervisor mode,
-	 * so we can access registers.
-	 */
-	li	t0, SSTATUS_FS_INITIAL
-	csrs	sstatus, t0
 
 	/* Restore registers */
-	ld	t0, (PCB_FCSR)(\p)
-	fscsr	t0
-	fld	f0, (PCB_X + 0 * 16)(\p)
-	fld	f1, (PCB_X + 1 * 16)(\p)
-	fld	f2, (PCB_X + 2 * 16)(\p)
-	fld	f3, (PCB_X + 3 * 16)(\p)
-	fld	f4, (PCB_X + 4 * 16)(\p)
-	fld	f5, (PCB_X + 5 * 16)(\p)
-	fld	f6, (PCB_X + 6 * 16)(\p)
-	fld	f7, (PCB_X + 7 * 16)(\p)
-	fld	f8, (PCB_X + 8 * 16)(\p)
-	fld	f9, (PCB_X + 9 * 16)(\p)
-	fld	f10, (PCB_X + 10 * 16)(\p)
-	fld	f11, (PCB_X + 11 * 16)(\p)
-	fld	f12, (PCB_X + 12 * 16)(\p)
-	fld	f13, (PCB_X + 13 * 16)(\p)
-	fld	f14, (PCB_X + 14 * 16)(\p)
-	fld	f15, (PCB_X + 15 * 16)(\p)
-	fld	f16, (PCB_X + 16 * 16)(\p)
-	fld	f17, (PCB_X + 17 * 16)(\p)
-	fld	f18, (PCB_X + 18 * 16)(\p)
-	fld	f19, (PCB_X + 19 * 16)(\p)
-	fld	f20, (PCB_X + 20 * 16)(\p)
-	fld	f21, (PCB_X + 21 * 16)(\p)
-	fld	f22, (PCB_X + 22 * 16)(\p)
-	fld	f23, (PCB_X + 23 * 16)(\p)
-	fld	f24, (PCB_X + 24 * 16)(\p)
-	fld	f25, (PCB_X + 25 * 16)(\p)
-	fld	f26, (PCB_X + 26 * 16)(\p)
-	fld	f27, (PCB_X + 27 * 16)(\p)
-	fld	f28, (PCB_X + 28 * 16)(\p)
-	fld	f29, (PCB_X + 29 * 16)(\p)
-	fld	f30, (PCB_X + 30 * 16)(\p)
-	fld	f31, (PCB_X + 31 * 16)(\p)
+	EX fldx.d, $fa0, \p, (PCB_F + 0 * RSIZE)
+	EX fldx.d, $fa1, \p, (PCB_F + 1 * RSIZE)
+	EX fldx.d, $fa2, \p, (PCB_F + 2 * RSIZE)
+	EX fldx.d, $fa3, \p, (PCB_F + 3 * RSIZE)
+	EX fldx.d, $fa4, \p, (PCB_F + 4 * RSIZE)
+	EX fldx.d, $fa5, \p, (PCB_F + 5 * RSIZE)
+	EX fldx.d, $fa6, \p, (PCB_F + 6 * RSIZE)
+	EX fldx.d, $fa7, \p, (PCB_F + 7 * RSIZE)
 
-	/* Disable FPE usage in supervisor mode. */
-	li	t0, SSTATUS_FS_MASK
-	csrc	sstatus, t0
+	EX fldx.d, $ft0, \p, (PCB_F + 8 * RSIZE)
+	EX fldx.d, $ft1, \p, (PCB_F + 9 * RSIZE)
+	EX fldx.d, $ft2, \p, (PCB_F + 10 * RSIZE)
+	EX fldx.d, $ft3, \p, (PCB_F + 11 * RSIZE)
+	EX fldx.d, $ft4, \p, (PCB_F + 12 * RSIZE)
+	EX fldx.d, $ft5, \p, (PCB_F + 13 * RSIZE)
+	EX fldx.d, $ft6, \p, (PCB_F + 14 * RSIZE)
+	EX fldx.d, $ft7, \p, (PCB_F + 15 * RSIZE)
+	EX fldx.d, $ft8, \p, (PCB_F + 16 * RSIZE)
+	EX fldx.d, $ft9, \p, (PCB_F + 17 * RSIZE)
+	EX fldx.d, $ft10, \p, (PCB_F + 18 * RSIZE)
+	EX fldx.d, $ft11, \p, (PCB_F + 19 * RSIZE)
+	EX fldx.d, $ft12, \p, (PCB_F + 20 * RSIZE)
+	EX fldx.d, $ft13, \p, (PCB_F + 21 * RSIZE)
+	EX fldx.d, $ft14, \p, (PCB_F + 22 * RSIZE)
+	EX fldx.d, $ft15, \p, (PCB_F + 23 * RSIZE)
+
+	EX fldx.d, $fs0, \p, (PCB_F + 24 * RSIZE)
+	EX fldx.d, $fs1, \p, (PCB_F + 25 * RSIZE)
+	EX fldx.d, $fs2, \p, (PCB_F + 26 * RSIZE)
+	EX fldx.d, $fs3, \p, (PCB_F + 27 * RSIZE)
+	EX fldx.d, $fs4, \p, (PCB_F + 28 * RSIZE)
+	EX fldx.d, $fs5, \p, (PCB_F + 29 * RSIZE)
+	EX fldx.d, $fs6, \p, (PCB_F + 30 * RSIZE)
+	EX fldx.d, $fs7, \p, (PCB_F + 31 * RSIZE)
+
+	li.d $t0, (PCB_F + 32 * RSIZE)
+	ldx.d $t0, \p, $t0
+	movgr2fcsr  $fcsr0, $t0
+
 .endm
 
 /*
@@ -143,9 +142,9 @@
  */
 ENTRY(fpe_state_save)
 	/* Get pointer to PCB */
-	ld	a0, TD_PCB(a0)
-	__fpe_state_save a0
-	ret
+	ld.d	$a0, $a0, TD_PCB
+	__fpe_state_save $a0
+	jr	$ra
 END(fpe_state_save)
 
 /*
@@ -153,52 +152,44 @@ END(fpe_state_save)
  * fpe_state_clear(void)
  */
 ENTRY(fpe_state_clear)
-	/*
-	 * Enable FPE usage in supervisor mode,
-	 * so we can access registers.
-	 */
-	li	t0, SSTATUS_FS_INITIAL
-	csrs	sstatus, t0
 
-	fscsr	zero
-	fcvt.d.l f0, zero
-	fcvt.d.l f1, zero
-	fcvt.d.l f2, zero
-	fcvt.d.l f3, zero
-	fcvt.d.l f4, zero
-	fcvt.d.l f5, zero
-	fcvt.d.l f6, zero
-	fcvt.d.l f7, zero
-	fcvt.d.l f8, zero
-	fcvt.d.l f9, zero
-	fcvt.d.l f10, zero
-	fcvt.d.l f11, zero
-	fcvt.d.l f12, zero
-	fcvt.d.l f13, zero
-	fcvt.d.l f14, zero
-	fcvt.d.l f15, zero
-	fcvt.d.l f16, zero
-	fcvt.d.l f17, zero
-	fcvt.d.l f18, zero
-	fcvt.d.l f19, zero
-	fcvt.d.l f20, zero
-	fcvt.d.l f21, zero
-	fcvt.d.l f22, zero
-	fcvt.d.l f23, zero
-	fcvt.d.l f24, zero
-	fcvt.d.l f25, zero
-	fcvt.d.l f26, zero
-	fcvt.d.l f27, zero
-	fcvt.d.l f28, zero
-	fcvt.d.l f29, zero
-	fcvt.d.l f30, zero
-	fcvt.d.l f31, zero
+	li.w	$t0, 0
+	movgr2fr.d $fa0, $t0
+	movgr2fr.d $fa1, $t0
+	movgr2fr.d $fa2, $t0
+	movgr2fr.d $fa3, $t0
+	movgr2fr.d $fa4, $t0
+	movgr2fr.d $fa5, $t0
+	movgr2fr.d $fa6, $t0
+	movgr2fr.d $fa7, $t0
 
-	/* Disable FPE usage in supervisor mode. */
-	li	t0, SSTATUS_FS_MASK
-	csrc	sstatus, t0
+	movgr2fr.d $ft0, $t0
+	movgr2fr.d $ft1, $t0
+	movgr2fr.d $ft2, $t0
+	movgr2fr.d $ft3, $t0
+	movgr2fr.d $ft4, $t0
+	movgr2fr.d $ft5, $t0
+	movgr2fr.d $ft6, $t0
+	movgr2fr.d $ft7, $t0
+	movgr2fr.d $ft8, $t0
+	movgr2fr.d $ft9, $t0
+	movgr2fr.d $ft10, $t0
+	movgr2fr.d $ft11, $t0
+	movgr2fr.d $ft12, $t0
+	movgr2fr.d $ft13, $t0
+	movgr2fr.d $ft14, $t0
+	movgr2fr.d $ft15, $t0
 
-	ret
+	movgr2fr.d $fs0, $t0
+	movgr2fr.d $fs1, $t0
+	movgr2fr.d $fs2, $t0
+	movgr2fr.d $fs3, $t0
+	movgr2fr.d $fs4, $t0
+	movgr2fr.d $fs5, $t0
+	movgr2fr.d $fs6, $t0
+	movgr2fr.d $fs7, $t0
+
+	jr	$ra
 END(fpe_state_clear)
 
 /*
@@ -206,46 +197,43 @@ END(fpe_state_clear)
  */
 ENTRY(cpu_throw)
 	/* Activate the new thread's pmap. */
-	mv	s0, a1
-	mv	a0, a1
-	call	_C_LABEL(pmap_activate_sw)
-	mv	a0, s0
+	move	$s0, $a1
+	move	$a0, $a1
+	bl	_C_LABEL(pmap_activate_sw)
+	move	$a0, $s0
 
 	/* Store the new curthread */
-	sd	a0, PC_CURTHREAD(tp)
+	st.d	$a0, $r21, PC_CURTHREAD
 	/* And the new pcb */
-	ld	x13, TD_PCB(a0)
-	sd	x13, PC_CURPCB(tp)
+	ld.d	$a3, $a0, TD_PCB
+	st.d	$a3, $r21, PC_CURPCB
 
 	/* Load registers */
-	ld	ra, (PCB_RA)(x13)
-	ld	sp, (PCB_SP)(x13)
+	ld.d	$ra, $a3, PCB_RA
+	ld.d	$sp, $a3, PCB_SP
 
-	/* s[0-11] */
-	ld	s0, (PCB_S + 0 * 8)(x13)
-	ld	s1, (PCB_S + 1 * 8)(x13)
-	ld	s2, (PCB_S + 2 * 8)(x13)
-	ld	s3, (PCB_S + 3 * 8)(x13)
-	ld	s4, (PCB_S + 4 * 8)(x13)
-	ld	s5, (PCB_S + 5 * 8)(x13)
-	ld	s6, (PCB_S + 6 * 8)(x13)
-	ld	s7, (PCB_S + 7 * 8)(x13)
-	ld	s8, (PCB_S + 8 * 8)(x13)
-	ld	s9, (PCB_S + 9 * 8)(x13)
-	ld	s10, (PCB_S + 10 * 8)(x13)
-	ld	s11, (PCB_S + 11 * 8)(x13)
+	/* s[0-8] */
+	ld.d	$s0, $a3, (PCB_S + 0 * 8)
+	ld.d	$s1, $a3, (PCB_S + 1 * 8)
+	ld.d	$s2, $a3, (PCB_S + 2 * 8)
+	ld.d	$s3, $a3, (PCB_S + 3 * 8)
+	ld.d	$s4, $a3, (PCB_S + 4 * 8)
+	ld.d	$s5, $a3, (PCB_S + 5 * 8)
+	ld.d	$s6, $a3, (PCB_S + 6 * 8)
+	ld.d	$s7, $a3, (PCB_S + 7 * 8)
+	ld.d	$s8, $a3, (PCB_S + 8 * 8)
 
 	/* Is FPE enabled for new thread? */
-	ld	t0, TD_FRAME(a0)
-	ld	t1, (TF_SSTATUS)(t0)
-	li	t2, SSTATUS_FS_MASK
-	and	t3, t1, t2
-	beqz	t3, 1f		/* No, skip. */
+	ld.d	$t0, $a0, TD_FRAME
+	ld.d	$t1, $t0, TF_EUEN
+
+	andi	$t2, $t1, CSR_EUEN_FPEN
+	beqz	$t2, 1f		/* No, skip. */
 
 	/* Restore registers. */
-	__fpe_state_load x13
+	__fpe_state_load $a3
 1:
-	ret
+	jr	$ra
 END(cpu_throw)
 
 /*
@@ -254,205 +242,230 @@ END(cpu_throw)
  * a0 = old
  * a1 = new
  * a2 = mtx
- * x3 to x7, x16 and x17 are caller saved
  */
 ENTRY(cpu_switch)
-	/* Store the new curthread */
-	sd	a1, PC_CURTHREAD(tp)
-	/* And the new pcb */
-	ld	x13, TD_PCB(a1)
-	sd	x13, PC_CURPCB(tp)
+	/* Save the old context FIRST, before overwriting callee-saved regs. */
+	ld.d	$a3, $a0, TD_PCB
 
-	/* Save the old context. */
-	ld	x13, TD_PCB(a0)
+	/* Store ra, sp, fp and the callee-saved registers */
+	st.d	$ra, $a3, PCB_RA
+	st.d	$sp, $a3, PCB_SP
+	st.d	$fp, $a3, PCB_FP
 
-	/* Store ra, sp and the callee-saved registers */
-	sd	ra, (PCB_RA)(x13)
-	sd	sp, (PCB_SP)(x13)
-
-	/* s[0-11] */
-	sd	s0, (PCB_S + 0 * 8)(x13)
-	sd	s1, (PCB_S + 1 * 8)(x13)
-	sd	s2, (PCB_S + 2 * 8)(x13)
-	sd	s3, (PCB_S + 3 * 8)(x13)
-	sd	s4, (PCB_S + 4 * 8)(x13)
-	sd	s5, (PCB_S + 5 * 8)(x13)
-	sd	s6, (PCB_S + 6 * 8)(x13)
-	sd	s7, (PCB_S + 7 * 8)(x13)
-	sd	s8, (PCB_S + 8 * 8)(x13)
-	sd	s9, (PCB_S + 9 * 8)(x13)
-	sd	s10, (PCB_S + 10 * 8)(x13)
-	sd	s11, (PCB_S + 11 * 8)(x13)
+	/* s[0-8] - save BEFORE overwriting with arguments */
+	st.d	$s0, $a3, (PCB_S + 0 * 8)
+	st.d	$s1, $a3, (PCB_S + 1 * 8)
+	st.d	$s2, $a3, (PCB_S + 2 * 8)
+	st.d	$s3, $a3, (PCB_S + 3 * 8)
+	st.d	$s4, $a3, (PCB_S + 4 * 8)
+	st.d	$s5, $a3, (PCB_S + 5 * 8)
+	st.d	$s6, $a3, (PCB_S + 6 * 8)
+	st.d	$s7, $a3, (PCB_S + 7 * 8)
+	st.d	$s8, $a3, (PCB_S + 8 * 8)
 
 	/*
 	 * Is FPE enabled and is it in dirty state
 	 * for the old thread?
 	 */
-	ld	t0, TD_FRAME(a0)
-	ld	t1, (TF_SSTATUS)(t0)
-	li	t2, SSTATUS_FS_MASK
-	and	t3, t1, t2
-	li	t2, SSTATUS_FS_DIRTY
-	bne	t3, t2, 1f		/* No, skip. */
+	ld.d	$t0, $a0, TD_FRAME
+	ld.d	$t1, $t0, TF_EUEN
+	andi	$t2, $t1, CSR_EUEN_FPEN
+	beqz	$t2, 1f		/* No, skip. */
 
 	/* Yes, mark FPE state clean and save registers. */
-	li	t2, ~SSTATUS_FS_MASK
-	and	t3, t1, t2
-	li	t2, SSTATUS_FS_CLEAN
-	or	t3, t3, t2
-	sd	t3, (TF_SSTATUS)(t0)
-
-	__fpe_state_save x13
+	__fpe_state_save $a3
 1:
+	/* NOW save arguments to callee-saved registers */
+	move	$s0, $a0		/* s0 = old thread */
+	move	$s1, $a1		/* s1 = new thread */
+	move	$s2, $a2		/* s2 = mtx */
 
-	/* Activate the new thread's pmap */
-	mv	s0, a0
-	mv	s1, a1
-	mv	s2, a2
-	mv	a0, a1
-	call	_C_LABEL(pmap_activate_sw)
-	mv	a1, s1
+	/* Store the new curthread and pcb */
+	st.d	$a1, $r21, PC_CURTHREAD
+	ld.d	$a3, $a1, TD_PCB
+	st.d	$a3, $r21, PC_CURPCB
+
+	/* Call pmap_activate_sw(new) */
+	move	$a0, $s1
+	bl	_C_LABEL(pmap_activate_sw)
 
 	/* Release the old thread */
-	sd	s2, TD_LOCK(s0)
+	st.d	$s2, $s0, TD_LOCK
+
 #if defined(SCHED_ULE) && defined(SMP)
 	/* Spin if TD_LOCK points to a blocked_lock */
-	la	s2, _C_LABEL(blocked_lock)
+	la.abs	$s2, _C_LABEL(blocked_lock)
 1:
-	ld	t0, TD_LOCK(a1)
-	beq	t0, s2, 1b
+	ld.d	$t0, $s1, TD_LOCK
+	beq	$t0, $s2, 1b
 #endif
+
 	/*
-	 * Restore the saved context.
+	 * Restore the saved context from new PCB.
 	 */
-	ld	x13, TD_PCB(a1)
+	ld.d	$a3, $s1, TD_PCB
 
-	/* Restore the registers */
-	ld	ra, (PCB_RA)(x13)
-	ld	sp, (PCB_SP)(x13)
+	/* Check if pcb is NULL - critical sanity check */
+	beqz	$a3, pcb_null_error
 
-	/* s[0-11] */
-	ld	s0, (PCB_S + 0 * 8)(x13)
-	ld	s1, (PCB_S + 1 * 8)(x13)
-	ld	s2, (PCB_S + 2 * 8)(x13)
-	ld	s3, (PCB_S + 3 * 8)(x13)
-	ld	s4, (PCB_S + 4 * 8)(x13)
-	ld	s5, (PCB_S + 5 * 8)(x13)
-	ld	s6, (PCB_S + 6 * 8)(x13)
-	ld	s7, (PCB_S + 7 * 8)(x13)
-	ld	s8, (PCB_S + 8 * 8)(x13)
-	ld	s9, (PCB_S + 9 * 8)(x13)
-	ld	s10, (PCB_S + 10 * 8)(x13)
-	ld	s11, (PCB_S + 11 * 8)(x13)
+	/* Restore ra, fp first */
+	ld.d	$ra, $a3, PCB_RA
+	ld.d	$fp, $a3, PCB_FP
+
+	/* s[1-6] - restore to temporaries */
+	ld.d	$t1, $a3, (PCB_S + 1 * 8)
+	ld.d	$t2, $a3, (PCB_S + 2 * 8)
+	ld.d	$t3, $a3, (PCB_S + 3 * 8)
+	ld.d	$t4, $a3, (PCB_S + 4 * 8)
+	ld.d	$t5, $a3, (PCB_S + 5 * 8)
+	ld.d	$t6, $a3, (PCB_S + 6 * 8)
 
 	/* Is FPE enabled for new thread? */
-	ld	t0, TD_FRAME(a1)
-	ld	t1, (TF_SSTATUS)(t0)
-	li	t2, SSTATUS_FS_MASK
-	and	t3, t1, t2
-	beqz	t3, 1f		/* No, skip. */
+	ld.d	$t0, $s1, TD_FRAME
+	ld.d	$t0, $a3, PCB_FPFLAGS
+	andi	$t0, $t0, 0x1
+	beqz	$t0, 1f
 
-	/* Restore registers. */
-	__fpe_state_load x13
+	/* Restore FPE registers */
+	__fpe_state_load $a3
 1:
-	ret
+	/* Restore s0 from PCB */
+	ld.d	$t0, $a3, (PCB_S + 0 * 8)
+
+	/* Restore s7-s8 from PCB */
+	ld.d	$t7, $a3, (PCB_S + 7 * 8)
+	ld.d	$t8, $a3, (PCB_S + 8 * 8)
+
+	/* Now restore sp */
+	ld.d	$sp, $a3, PCB_SP
+
+	/* Now restore s[0-8] */
+	move	$s0, $t0
+	move	$s1, $t1
+	move	$s2, $t2
+	move	$s3, $t3
+	move	$s4, $t4
+	move	$s5, $t5
+	move	$s6, $t6
+	move	$s7, $t7
+	move	$s8, $t8
+
+	jr	$ra
+
+pcb_null_error:
+	/* PCB is NULL - fatal error */
+0:
+	b	0b
+
 END(cpu_switch)
 
-/*
- * fork_exit(void (*callout)(void *, struct trapframe *), void *arg,
- *  struct trapframe *frame)
- */
-
 ENTRY(fork_trampoline)
-	mv	a0, s0
-	mv	a1, s1
-	mv	a2, sp
-	call	_C_LABEL(fork_exit)
-
-	/* Restore sstatus */
-	ld	t0, (TF_SSTATUS)(sp)
-	/* Ensure interrupts disabled */
-	li	t1, ~SSTATUS_SIE
-	and	t0, t0, t1
-	csrw	sstatus, t0
-
-	/* Restore exception program counter */
-	ld	t0, (TF_SEPC)(sp)
-	csrw	sepc, t0
-
-	/* Restore the registers */
-	ld	t0, (TF_T + 0 * 8)(sp)
-	ld	t1, (TF_T + 1 * 8)(sp)
-	ld	t2, (TF_T + 2 * 8)(sp)
-	ld	t3, (TF_T + 3 * 8)(sp)
-	ld	t4, (TF_T + 4 * 8)(sp)
-	ld	t5, (TF_T + 5 * 8)(sp)
-	ld	t6, (TF_T + 6 * 8)(sp)
-
-	ld	s0, (TF_S + 0 * 8)(sp)
-	ld	s1, (TF_S + 1 * 8)(sp)
-	ld	s2, (TF_S + 2 * 8)(sp)
-	ld	s3, (TF_S + 3 * 8)(sp)
-	ld	s4, (TF_S + 4 * 8)(sp)
-	ld	s5, (TF_S + 5 * 8)(sp)
-	ld	s6, (TF_S + 6 * 8)(sp)
-	ld	s7, (TF_S + 7 * 8)(sp)
-	ld	s8, (TF_S + 8 * 8)(sp)
-	ld	s9, (TF_S + 9 * 8)(sp)
-	ld	s10, (TF_S + 10 * 8)(sp)
-	ld	s11, (TF_S + 11 * 8)(sp)
-
-	ld	a0, (TF_A + 0 * 8)(sp)
-	ld	a1, (TF_A + 1 * 8)(sp)
-	ld	a2, (TF_A + 2 * 8)(sp)
-	ld	a3, (TF_A + 3 * 8)(sp)
-	ld	a4, (TF_A + 4 * 8)(sp)
-	ld	a5, (TF_A + 5 * 8)(sp)
-	ld	a6, (TF_A + 6 * 8)(sp)
-	ld	a7, (TF_A + 7 * 8)(sp)
-
-	/* Load user ra and gp */
-	ld	ra, (TF_RA)(sp)
-	ld	gp, (TF_GP)(sp)
+	/* Call fork_exit(s0, s1, sp) */
+	move	$a0, $s0
+	move	$a1, $s1
+	move	$a2, $sp
+	bl	_C_LABEL(fork_exit)
 
 	/*
-	 * Store our pcpup on stack, we will load it back
-	 * on kernel mode trap.
+	 * Save kernel stack pointer to KS0 for use during user traps.
 	 */
-	sd	tp, (TF_SIZE + KF_TP)(sp)
-	ld	tp, (TF_TP)(sp)
+	addi.d	$t0, $sp, TF_SIZE
+	csrwr 	$t0, LOONGARCH_CSR_KS0
 
-	/* Save kernel stack so we can use it doing a user trap */
-	addi	sp, sp, TF_SIZE
-	csrw	sscratch, sp
+	/*
+	 * Save kernel per-CPU base pointer to KS3 before restoring
+	 * the user-mode $r21 from trapframe.
+	 */
+	csrwr	$r21, PERCPU_BASE_KS
 
-	/* Load user stack */
-	ld	sp, (TF_SP - TF_SIZE)(sp)
+	/*
+	 * Restore PRMD and ERA from trapframe.  CRMD is NOT restored
+	 * here; the ertn instruction atomically sets CRMD.PLV from
+	 * PRMD.PPLV and CRMD.IE from PRMD.PIE.
+	 */
+	ld.d	$t0, $sp, TF_PRMD
+	csrwr	$t0, LOONGARCH_CSR_PRMD
 
-	sret
+	/* Restore exception program counter */
+	ld.d	$t0, $sp, TF_ERA
+	csrwr	$t0, LOONGARCH_CSR_ERA
+
+	/*
+	 * Invalidate TLB for GOT page BEFORE restoring user registers,
+	 * so that $t0/$t1 are not clobbered.
+	 */
+	dbar	0
+	csrrd	$t0, LOONGARCH_CSR_ASID
+	andi	$t0, $t0, 0x3ff
+	li.d	$t1, 0xe2000
+	invtlb	4, $t0, $t1
+
+	/* Restore the registers */
+	ld.d	$t0, $sp, (TF_T + 0 * 8)
+	ld.d	$t1, $sp, (TF_T + 1 * 8)
+	ld.d	$t2, $sp, (TF_T + 2 * 8)
+	ld.d	$t3, $sp, (TF_T + 3 * 8)
+	ld.d	$t4, $sp, (TF_T + 4 * 8)
+	ld.d	$t5, $sp, (TF_T + 5 * 8)
+	ld.d	$t6, $sp, (TF_T + 6 * 8)
+	ld.d	$t7, $sp, (TF_T + 7 * 8)
+	ld.d	$t8, $sp, (TF_T + 8 * 8)
+
+	ld.d	$s0, $sp, (TF_S + 0 * 8)
+	ld.d	$s1, $sp, (TF_S + 1 * 8)
+	ld.d	$s2, $sp, (TF_S + 2 * 8)
+	ld.d	$s3, $sp, (TF_S + 3 * 8)
+	ld.d	$s4, $sp, (TF_S + 4 * 8)
+	ld.d	$s5, $sp, (TF_S + 5 * 8)
+	ld.d	$s6, $sp, (TF_S + 6 * 8)
+	ld.d	$s7, $sp, (TF_S + 7 * 8)
+	ld.d	$s8, $sp, (TF_S + 8 * 8)
+
+	ld.d	$a0, $sp, (TF_A + 0 * 8)
+	ld.d	$a1, $sp, (TF_A + 1 * 8)
+	ld.d	$a2, $sp, (TF_A + 2 * 8)
+	ld.d	$a3, $sp, (TF_A + 3 * 8)
+	ld.d	$a4, $sp, (TF_A + 4 * 8)
+	ld.d	$a5, $sp, (TF_A + 5 * 8)
+	ld.d	$a6, $sp, (TF_A + 6 * 8)
+	ld.d	$a7, $sp, (TF_A + 7 * 8)
+
+	/* Load user ra */
+	ld.d	$ra, $sp, TF_RA
+
+	/* Restore $tp from trapframe */
+	ld.d	$tp, $sp, TF_TP
+
+	/* Restore $r21 from trapframe */
+	ld.d	$r21, $sp, TF_R21
+
+	/* Restore user frame pointer from trapframe */
+	ld.d	$fp, $sp, TF_R22
+
+	/* Now restore user stack pointer last */
+	ld.d	$sp, $sp, TF_SP
+
+	ertn
 END(fork_trampoline)
 
 ENTRY(savectx)
-	/* Store ra, sp and the callee-saved registers */
-	sd	ra, (PCB_RA)(a0)
-	sd	sp, (PCB_SP)(a0)
-	sd	tp, (PCB_TP)(a0)
-	sd	gp, (PCB_GP)(a0)
+	/* Store ra, sp tp, fp and the callee-saved registers */
+	st.d	$ra, $a0, (32)
+	st.d	$sp, $a0, (48)
+	st.d	$tp, $a0, (40)
+	st.d	$fp, $a0, (200)
 
-	/* s[0-11] */
-	sd	s0, (PCB_S + 0 * 8)(a0)
-	sd	s1, (PCB_S + 1 * 8)(a0)
-	sd	s2, (PCB_S + 2 * 8)(a0)
-	sd	s3, (PCB_S + 3 * 8)(a0)
-	sd	s4, (PCB_S + 4 * 8)(a0)
-	sd	s5, (PCB_S + 5 * 8)(a0)
-	sd	s6, (PCB_S + 6 * 8)(a0)
-	sd	s7, (PCB_S + 7 * 8)(a0)
-	sd	s8, (PCB_S + 8 * 8)(a0)
-	sd	s9, (PCB_S + 9 * 8)(a0)
-	sd	s10, (PCB_S + 10 * 8)(a0)
-	sd	s11, (PCB_S + 11 * 8)(a0)
+	/* s[0-8] */
+	st.d	$s0, $a0, (PCB_S + 0 * 8)
+	st.d	$s1, $a0, (PCB_S + 1 * 8)
+	st.d	$s2, $a0, (PCB_S + 2 * 8)
+	st.d	$s3, $a0, (PCB_S + 3 * 8)
+	st.d	$s4, $a0, (PCB_S + 4 * 8)
+	st.d	$s5, $a0, (PCB_S + 5 * 8)
+	st.d	$s6, $a0, (PCB_S + 6 * 8)
+	st.d	$s7, $a0, (PCB_S + 7 * 8)
+	st.d	$s8, $a0, (PCB_S + 8 * 8)
 
-	__fpe_state_save a0
-	ret
+	__fpe_state_save $a0
+	jr	$ra
 END(savectx)

@@ -1131,6 +1131,14 @@ fork_exit(void (*callout)(void *, struct trapframe *), void *arg,
 	CTR4(KTR_PROC, "fork_exit: new thread %p (td_sched %p, pid %d, %s)",
 	    td, td_get_sched(td), p->p_pid, td->td_name);
 
+#if 0	/* DEBUG: causes cnputs_mtx deadlock on SMP */
+	printf("FORK_EXIT: CPU%d pid %d tid %d \"%s\" callout=%p "
+	    "md_spinlock_count=%d md_saved_crmd_ie=%ld\n",
+	    PCPU_GET(cpuid), td->td_proc->p_pid, td->td_tid,
+	    td->td_name, callout,
+	    td->td_md.md_spinlock_count, td->td_md.md_saved_crmd_ie);
+#endif
+
 	sched_fork_exit(td);
 
 	/*
@@ -1143,6 +1151,13 @@ fork_exit(void (*callout)(void *, struct trapframe *), void *arg,
 		thread_stash(dtd);
 	}
 	thread_unlock(td);
+
+#if 0	/* DEBUG: causes cnputs_mtx deadlock on SMP */
+	printf("FORK_EXIT: after thread_unlock, CPU%d pid %d tid %d "
+	    "md_spinlock_count=%d\n",
+	    PCPU_GET(cpuid), td->td_proc->p_pid, td->td_tid,
+	    td->td_md.md_spinlock_count);
+#endif
 
 	/*
 	 * cpu_fork_kthread_handler intercepts this function call to
@@ -1157,8 +1172,12 @@ fork_exit(void (*callout)(void *, struct trapframe *), void *arg,
 	 * function.
 	 */
 	if (p->p_flag & P_KPROC) {
-		printf("Kernel thread \"%s\" (pid %d) exited prematurely.\n",
-		    td->td_name, p->p_pid);
+#if 0	/* DEBUG: causes cnputs_mtx deadlock on SMP */
+		printf("FORK_EXIT: kernel thread \"%s\" (pid %d tid %d) "
+		    "returned, md_spinlock_count=%d, calling kthread_exit\n",
+		    td->td_name, p->p_pid, td->td_tid,
+		    td->td_md.md_spinlock_count);
+#endif
 		kthread_exit();
 	}
 	mtx_assert(&Giant, MA_NOTOWNED);

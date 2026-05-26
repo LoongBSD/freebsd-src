@@ -1,6 +1,9 @@
 /*-
  * Copyright (c) 1999 Luoqi Chen <luoqi@freebsd.org>
  * Copyright (c) 2015-2016 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -44,10 +47,12 @@
 /* Keep in sync with db_show_mdpcpu() */
 #define	PCPU_MD_FIELDS							\
 	struct pmap *pc_curpmap;	/* Currently active pmap */	\
+	u_int	pc_acpi_id;		/* ACPI CPU id */		\
 	uint32_t pc_pending_ipis;	/* IPIs pending to this CPU */	\
 	uint32_t pc_hart;		/* Hart ID */			\
-	uint64_t pc_clock;						\
-	char __pad[48]			/* Pad to factor of PAGE_SIZE */
+	u_int	pc_asid;		/* Current ASID */		\
+	u_int	pc_asid_generation;	/* Current ASID generation */	\
+	char __pad[44]			/* Pad to factor of PAGE_SIZE */
 
 #ifdef _KERNEL
 
@@ -59,7 +64,7 @@ get_pcpu(void)
 {
 	struct pcpu *pcpu;
 
-	__asm __volatile("mv %0, tp" : "=&r"(pcpu));
+	__asm __volatile("move %0, $r21" : "=&r"(pcpu));
 
 	return (pcpu);
 }
@@ -68,8 +73,7 @@ static inline struct thread *
 get_curthread(void)
 {
 	struct thread *td;
-
-	__asm __volatile("ld %0, 0(tp)" : "=&r"(td));
+	__asm __volatile("ld.d %0, $r21, 0" : "=&r"(td));
 
 	return (td);
 }

@@ -1567,6 +1567,26 @@ typedef struct {
 #define	R_LARCH_TLS_GD_PCREL20_S2		125
 #define	R_LARCH_TLS_DESC_PCREL20_S2		126
 
+/*
+ * Relocs added in ELF for the LoongArch™ Architecture v20240806, part of the
+ * v2.40 LoongArch ABI specs.
+ *
+ * Spec addition: https://github.com/loongson/la-abi-specs/pull/9
+ */
+#define	R_LARCH_CALL30				127
+#define	R_LARCH_PCADD_HI20			128
+#define	R_LARCH_PCADD_LO12			129
+#define	R_LARCH_GOT_PCADD_HI20			130
+#define	R_LARCH_GOT_PCADD_LO12			131
+#define	R_LARCH_TLS_IE_PCADD_HI20		132
+#define	R_LARCH_TLS_IE_PCADD_LO12		133
+#define	R_LARCH_TLS_LD_PCADD_HI20		134
+#define	R_LARCH_TLS_LD_PCADD_LO12		135
+#define	R_LARCH_TLS_GD_PCADD_HI20		136
+#define	R_LARCH_TLS_GD_PCADD_LO12		137
+#define	R_LARCH_TLS_DESC_PCADD_HI20		138
+#define	R_LARCH_TLS_DESC_PCADD_LO12		139
+
 #define	R_SPARC_NONE		0
 #define	R_SPARC_8		1
 #define	R_SPARC_16		2

@@ -588,7 +588,7 @@ vtpci_legacy_alloc_resources(struct vtpci_legacy_softc *sc)
 	 * Most hypervisors export the common configuration structure in IO
 	 * space, but some use memory space; try both.
 	 */
-	for (i = 0; nitems(res_types); i++) {
+	for (i = 0; i < nitems(res_types); i++) {
 		rid = PCIR_BAR(0);
 		sc->vtpci_res_type = res_types[i];
 		sc->vtpci_res = bus_alloc_resource_any(dev, res_types[i], &rid,

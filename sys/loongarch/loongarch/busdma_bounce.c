@@ -1,6 +1,8 @@
 /*-
  * Copyright (c) 1997, 1998 Justin T. Gibbs.
  * Copyright (c) 2015-2016 The FreeBSD Foundation
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by Andrew Turner
@@ -31,6 +33,7 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -103,6 +106,7 @@ struct bus_dmamap {
 	struct sync_list	slist[];
 };
 
+int run_filter(bus_dma_tag_t dmat, bus_addr_t paddr);
 static void _bus_dmamap_count_pages(bus_dma_tag_t dmat, bus_dmamap_t map,
     pmap_t pmap, void *buf, bus_size_t buflen, int flags);
 static void _bus_dmamap_count_phys(bus_dma_tag_t dmat, bus_dmamap_t map,
@@ -129,16 +133,17 @@ static MALLOC_DEFINE(M_BUSDMA, "busdma", "busdma metadata");
 static int
 bounce_bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
     bus_addr_t boundary, bus_addr_t lowaddr, bus_addr_t highaddr,
-    bus_size_t maxsize, int nsegments, bus_size_t maxsegsz, int flags,
-    bus_dma_lock_t *lockfunc, void *lockfuncarg, bus_dma_tag_t *dmat)
+    bus_dma_filter_t *filter, void *filterarg, bus_size_t maxsize,
+    int nsegments, bus_size_t maxsegsz, int flags, bus_dma_lock_t *lockfunc,
+    void *lockfuncarg, bus_dma_tag_t *dmat)
 {
 	bus_dma_tag_t newtag;
 	int error;
 
 	*dmat = NULL;
 	error = common_bus_dma_tag_create(parent != NULL ? &parent->common :
-	    NULL, alignment, boundary, lowaddr, highaddr, maxsize, nsegments,
-	    maxsegsz, flags, lockfunc, lockfuncarg,
+	    NULL, alignment, boundary, lowaddr, highaddr, filter, filterarg,
+	    maxsize, nsegments, maxsegsz, flags, lockfunc, lockfuncarg,
 	    sizeof (struct bus_dma_tag), (void **)&newtag);
 	if (error != 0)
 		return (error);
@@ -151,7 +156,8 @@ bounce_bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 		newtag->bounce_flags |= BF_COHERENT;
 
 	if (parent != NULL) {
-		if ((parent->bounce_flags & BF_COULD_BOUNCE) != 0)
+		if ((newtag->common.filter != NULL ||
+		    (parent->bounce_flags & BF_COULD_BOUNCE) != 0))
 			newtag->bounce_flags |= BF_COULD_BOUNCE;
 
 		/* Copy some flags from the parent */
@@ -200,19 +206,38 @@ bounce_bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 static int
 bounce_bus_dma_tag_destroy(bus_dma_tag_t dmat)
 {
-	int error = 0;
+#ifdef KTR
+	bus_dma_tag_t dmat_copy = dmat;
+#endif
+	bus_dma_tag_t parent;
+	int error;
+
+	error = 0;
 
 	if (dmat != NULL) {
 		if (dmat->map_count != 0) {
 			error = EBUSY;
 			goto out;
 		}
-		if (dmat->segments != NULL)
-			free(dmat->segments, M_DEVBUF);
-		free(dmat, M_DEVBUF);
+		while (dmat != NULL) {
+			parent = (bus_dma_tag_t)dmat->common.parent;
+			atomic_subtract_int(&dmat->common.ref_count, 1);
+			if (dmat->common.ref_count == 0) {
+				if (dmat->segments != NULL)
+					free(dmat->segments, M_DEVBUF);
+				free(dmat, M_DEVBUF);
+				/*
+				 * Last reference count, so
+				 * release our reference
+				 * count on our parent.
+				 */
+				dmat = parent;
+			} else
+				dmat = NULL;
+		}
 	}
 out:
-	CTR3(KTR_BUSDMA, "%s tag %p error %d", __func__, dmat, error);
+	CTR3(KTR_BUSDMA, "%s tag %p error %d", __func__, dmat_copy, error);
 	return (error);
 }
 
@@ -460,7 +485,7 @@ bounce_bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
 
 /*
  * Free a piece of memory and it's allociated dmamap, that was allocated
- * via bus_dmamem_alloc.
+ * via bus_dmamem_alloc.  Make the same choice for free/contigfree.
  */
 static void
 bounce_bus_dmamem_free(bus_dma_tag_t dmat, void *vaddr, bus_dmamap_t map)
@@ -497,8 +522,8 @@ _bus_dmamap_count_phys(bus_dma_tag_t dmat, bus_dmamap_t map, vm_paddr_t buf,
 		 */
 		curaddr = buf;
 		while (buflen != 0) {
-			sgsize = buflen;
-			if (addr_needs_bounce(dmat, curaddr)) {
+			sgsize = MIN(buflen, dmat->common.maxsegsz);
+			if (bus_dma_run_filter(&dmat->common, curaddr)) {
 				sgsize = MIN(sgsize,
 				    PAGE_SIZE - (curaddr & PAGE_MASK));
 				map->pagesneeded++;
@@ -534,13 +559,12 @@ _bus_dmamap_count_pages(bus_dma_tag_t dmat, bus_dmamap_t map, pmap_t pmap,
 		vendaddr = (vm_offset_t)buf + buflen;
 
 		while (vaddr < vendaddr) {
-			sg_len = MIN(vendaddr - vaddr,
-			    PAGE_SIZE - ((vm_offset_t)vaddr & PAGE_MASK));
+			sg_len = PAGE_SIZE - ((vm_offset_t)vaddr & PAGE_MASK);
 			if (pmap == kernel_pmap)
 				paddr = pmap_kextract(vaddr);
 			else
 				paddr = pmap_extract(pmap, vaddr);
-			if (addr_needs_bounce(dmat, paddr)) {
+			if (bus_dma_run_filter(&dmat->common, paddr) != 0) {
 				sg_len = roundup2(sg_len,
 				    dmat->common.alignment);
 				map->pagesneeded++;
@@ -582,10 +606,10 @@ bounce_bus_dmamap_load_phys(bus_dma_tag_t dmat, bus_dmamap_t map,
 
 	while (buflen > 0) {
 		curaddr = buf;
-		sgsize = buflen;
+		sgsize = MIN(buflen, dmat->common.maxsegsz);
 		if (((dmat->bounce_flags & BF_COULD_BOUNCE) != 0) &&
 		    map->pagesneeded != 0 &&
-		    addr_needs_bounce(dmat, curaddr)) {
+		    bus_dma_run_filter(&dmat->common, curaddr)) {
 			sgsize = MIN(sgsize, PAGE_SIZE - (curaddr & PAGE_MASK));
 			curaddr = add_bounce_page(dmat, map, 0, curaddr,
 			    sgsize);
@@ -607,8 +631,9 @@ bounce_bus_dmamap_load_phys(bus_dma_tag_t dmat, bus_dmamap_t map,
 			} else
 				sl->datacount += sgsize;
 		}
-		if (!_bus_dmamap_addsegs(dmat, map, curaddr, sgsize, segs,
-		    segp))
+		sgsize = _bus_dmamap_addseg(dmat, map, curaddr, sgsize, segs,
+		    segp);
+		if (sgsize == 0)
 			break;
 		buf += sgsize;
 		buflen -= sgsize;
@@ -630,7 +655,7 @@ bounce_bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
     int *segp)
 {
 	struct sync_list *sl;
-	bus_size_t sgsize;
+	bus_size_t sgsize, max_sgsize;
 	bus_addr_t curaddr, sl_pend;
 	vm_offset_t kvaddr, vaddr, sl_vend;
 	int error;
@@ -667,15 +692,17 @@ bounce_bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 		/*
 		 * Compute the segment size, and adjust counts.
 		 */
-		sgsize = MIN(buflen, PAGE_SIZE - (curaddr & PAGE_MASK));
+		max_sgsize = MIN(buflen, dmat->common.maxsegsz);
+		sgsize = PAGE_SIZE - (curaddr & PAGE_MASK);
 		if (((dmat->bounce_flags & BF_COULD_BOUNCE) != 0) &&
 		    map->pagesneeded != 0 &&
-		    addr_needs_bounce(dmat, curaddr)) {
+		    bus_dma_run_filter(&dmat->common, curaddr)) {
 			sgsize = roundup2(sgsize, dmat->common.alignment);
-			sgsize = MIN(sgsize, buflen);
+			sgsize = MIN(sgsize, max_sgsize);
 			curaddr = add_bounce_page(dmat, map, kvaddr, curaddr,
 			    sgsize);
 		} else if ((dmat->bounce_flags & BF_COHERENT) == 0) {
+			sgsize = MIN(sgsize, max_sgsize);
 			if (map->sync_count > 0) {
 				sl_pend = sl->paddr + sl->datacount;
 				sl_vend = sl->vaddr + sl->datacount;
@@ -701,12 +728,15 @@ bounce_bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 				sl->datacount = sgsize;
 			} else
 				sl->datacount += sgsize;
+		} else {
+			sgsize = MIN(sgsize, max_sgsize);
 		}
-		if (!_bus_dmamap_addsegs(dmat, map, curaddr, sgsize, segs,
-		    segp))
+		sgsize = _bus_dmamap_addseg(dmat, map, curaddr, sgsize, segs,
+		    segp);
+		if (sgsize == 0)
 			break;
 		vaddr += sgsize;
-		buflen -= MIN(sgsize, buflen); /* avoid underflow */
+		buflen -= sgsize;
 	}
 
 cleanup:

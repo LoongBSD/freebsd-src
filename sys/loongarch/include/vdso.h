@@ -1,5 +1,8 @@
 /*-
  * Copyright 2012 Konstantin Belousov <kib@FreeBSD.ORG>.
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,9 +29,52 @@
 #ifndef _MACHINE_VDSO_H_
 #define	_MACHINE_VDSO_H_
 
-#define	VDSO_TIMEHANDS_MD			\
-	uint32_t	th_res[8];
+/*
+ * vDSO (virtual Dynamic Shared Object) definitions for LoongArch.
+ *
+ * The vDSO provides user-space access to certain kernel services without
+ * the overhead of a system call. On LoongArch, this includes:
+ * - High-resolution time access via rdtime.d instruction
+ * - gettimeofday()
+ * - clock_gettime()
+ *
+ * Based on LoongArch ELF psABI specification (lapcs.adoc).
+ */
 
-#define	VDSO_TH_ALGO_RISCV_RDTIME	VDSO_TH_ALGO_1
+/*
+ * Architecture-specific timehands data.
+ * This structure is mapped to user space and contains timekeeping data.
+ */
+#define	VDSO_TIMEHANDS_MD			\
+	uint32_t	th_res[8];		/* Reserved for future use */
+
+/*
+ * vDSO timehands algorithm identifier.
+ * VDSO_TH_ALGO_1: Use rdtime.d instruction for time access.
+ *
+ * The LoongArch rdtime.d instruction reads the 64-bit timer value.
+ */
+#define	VDSO_TH_ALGO_LOONGARCH_RDTIME	VDSO_TH_ALGO_1
+
+/*
+ * vDSO function prototypes (for kernel internal use).
+ * These functions are implemented in sys/loongarch/loongarch/vdso.c
+ */
+#ifdef _KERNEL
+
+/*
+ * Read the current counter value using rdtime.d instruction.
+ * Returns: 64-bit timer value.
+ */
+static __inline uint64_t
+vdso_gettc(void)
+{
+	uint64_t val;
+
+	__asm __volatile("rdtime.d %0, $zero" : "=r" (val));
+	return (val);
+}
+
+#endif /* _KERNEL */
 
 #endif /* !_MACHINE_VDSO_H_ */

@@ -1,5 +1,9 @@
 /*-
  * Copyright (c) 2015 The FreeBSD Foundation
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,11 +27,51 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * PCI configuration register access routines for LoongArch
+ * 
+ * These functions are used by ACPI to access PCI configuration space.
+ * Implementation is in loongarch/loongarch/pci_cfgreg.c
+ */
+
 #ifndef _MACHINE_PCI_CFGREG_H
 #define	_MACHINE_PCI_CFGREG_H
 
+#ifdef _KERNEL
+
+/*
+ * Open PCI configuration space access.
+ * Returns 1 on success, 0 on failure.
+ */
 int pci_cfgregopen(void);
-uint32_t pci_cfgregread(int, int, int, int, int, int);
-void pci_cfgregwrite(int, int, int, int, int, uint32_t, int);
+
+/*
+ * Read from PCI configuration space.
+ * 
+ * domain:   PCI domain number
+ * bus:      PCI bus number
+ * slot:     PCI slot number
+ * func:     PCI function number
+ * reg:      Configuration register offset
+ * width:    Access width in bytes (1, 2, 4)
+ * 
+ * Returns the value read from the configuration register.
+ */
+uint32_t pci_cfgregread(int domain, int bus, int slot, int func, int reg, int width);
+
+/*
+ * Write to PCI configuration space.
+ * 
+ * domain:   PCI domain number
+ * bus:      PCI bus number
+ * slot:     PCI slot number
+ * func:     PCI function number
+ * reg:      Configuration register offset
+ * width:    Access width in bytes (1, 2, 4)
+ * val:      Value to write
+ */
+void pci_cfgregwrite(int domain, int bus, int slot, int func, int reg, int width, uint32_t val);
+
+#endif /* _KERNEL */
 
 #endif /* !_MACHINE_PCI_CFGREG_H */

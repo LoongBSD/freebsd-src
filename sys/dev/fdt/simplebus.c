@@ -450,6 +450,17 @@ simplebus_alloc_resource(device_t bus, device_t child, int type, int *rid,
 			return (NULL);
 
 		rle = resource_list_find(&di->rl, type, *rid);
+		/*
+		 * For architectures that use memory-mapped I/O (like ARM64,
+		 * RISC-V, and LoongArch), SYS_RES_IOPORT may be requested
+		 * but the device tree only defines SYS_RES_MEMORY. Fall back
+		 * to SYS_RES_MEMORY if SYS_RES_IOPORT is not found.
+		 */
+		if (rle == NULL && type == SYS_RES_IOPORT) {
+			rle = resource_list_find(&di->rl, SYS_RES_MEMORY, *rid);
+			if (rle != NULL)
+				type = SYS_RES_MEMORY;
+		}
 		if (rle == NULL) {
 			if (bootverbose)
 				device_printf(bus, "no default resources for "
@@ -459,9 +470,9 @@ simplebus_alloc_resource(device_t bus, device_t child, int type, int *rid,
 		start = rle->start;
 		end = rle->end;
 		count = rle->count;
-        }
+	       }
 
-	if (type == SYS_RES_MEMORY) {
+	if (type == SYS_RES_MEMORY || type == SYS_RES_IOPORT) {
 		/* Remap through ranges property */
 		for (j = 0; j < sc->nranges; j++) {
 			if (start >= sc->ranges[j].bus && end <

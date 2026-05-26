@@ -1,5 +1,7 @@
 /*-
  * Copyright (c) 2015 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -32,9 +34,10 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
 #include <sys/param.h>
 
-#include <machine/riscvreg.h>
+#include <machine/loongarchreg.h>
 
 #include <inttypes.h>
 #include <stdarg.h>
@@ -74,15 +77,19 @@ __makecontext(ucontext_t *ucp, void (*func)(void), int argc, ...)
 	gp = &ucp->uc_mcontext.mc_gpregs;
 
 	va_start(ap, argc);
-	/* Pass up to eight arguments in a0-7. */
+	/* Pass up to eight arguments in a0-a7. */
 	for (i = 0; i < argc && i < 8; i++)
-		gp->gp_a[i] = va_arg(ap, uint64_t);
+		gp->gp_regs[REG_A0 + i] = va_arg(ap, uint64_t);
 	va_end(ap);
 
-	/* Set the stack */
-	gp->gp_sp = STACKALIGN(ucp->uc_stack.ss_sp + ucp->uc_stack.ss_size);
-	/* Arrange for return via the trampoline code. */
-	gp->gp_sepc = (__register_t)_ctx_start;
-	gp->gp_s[0] = (__register_t)func;
-	gp->gp_s[1] = (__register_t)ucp;
+	/* Set the stack pointer */
+	gp->gp_regs[REG_SP] = STACKALIGN(ucp->uc_stack.ss_sp + ucp->uc_stack.ss_size);
+	/* Set return address */
+	gp->gp_regs[REG_RA] = (__register_t)_ctx_start;
+	/* Set ERA to the trampoline code. */
+	gp->gp_era = (__register_t)_ctx_start;
+	/* Save func pointer in s0 */
+	gp->gp_regs[REG_S0] = (__register_t)func;
+	/* Save ucp in s1 */
+	gp->gp_regs[REG_S1] = (__register_t)ucp;
 }

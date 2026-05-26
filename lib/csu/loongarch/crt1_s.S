@@ -2,6 +2,8 @@
 /*-
  * Copyright 1996-1998 John D. Polstra.
  * Copyright (c) 2015-2017 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -35,17 +37,20 @@
 
 #include <machine/asm.h>
 ENTRY(_start)
-	mv	a3, a2		# cleanup
-	addi	a1, a0, 8	# get argv
-	ld	a0, 0(a0)	# load argc
-	slli	t0, a0, 3	# mult by arg size
-	add	a2, a1, t0	# env is after argv
-	addi	a2, a2, 8	# argv is null terminated
-	.option push
-	.option norelax
-	lla	gp, __global_pointer$
-	.option pop
-	call	__start
-END(_start)
+	.cfi_label .Ldummy
+        .cfi_undefined 1
+	move		$a3, $a2    	# cleanup
+	addi.d		$a1, $a0, 8	# argv
+	ld.d		$a0, $a0, 0	# argc
+	slli.d		$t0, $a0, 3	# argv + argc * 8 => argv end
+	add.d		$a2, $a1, $t0	# env is after argv
+	addi.d		$a2, $a2, 8	# argv is null terminated
 
+        /* Adjust $sp for 16-aligned */
+        bstrins.d       $sp, $zero, 3, 0
+	/* __start(argc, argv, env, cleanup) */
+        la.pcrel        $ra, __start
+        jirl            $zero, $ra, 0
+
+END(_start)
 	.section .note.GNU-stack,"",%progbits

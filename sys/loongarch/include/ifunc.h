@@ -1,6 +1,11 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
  * Copyright (c) 2015-2018 The FreeBSD Foundation
  * Copyright (c) 2024 Jessica Clarke <jrtc27@FreeBSD.org>
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  *
  * Part of this software was developed by Konstantin Belousov <kib@FreeBSD.org>
  * under sponsorship from the FreeBSD Foundation.
@@ -27,8 +32,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef __RISCV_IFUNC_H
-#define	__RISCV_IFUNC_H
+#ifndef __LOONGARCH_IFUNC_H
+#define	__LOONGARCH_IFUNC_H
 
 #define	DEFINE_IFUNC(qual, ret_type, name, args)			\
     static ret_type (*name##_resolver(void))args __used;		\

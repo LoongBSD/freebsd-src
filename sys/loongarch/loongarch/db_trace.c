@@ -1,8 +1,10 @@
 /*-
  * Copyright (c) 2015 The FreeBSD Foundation
  * Copyright (c) 2016 Ruslan Bukin <br@bsdpad.com>
- * All rights reserved.
  * Copyright (c) 2020 John Baldwin <jhb@FreeBSD.org>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
+ * All rights reserved.
  *
  * Portions of this software were developed by Semihalf under
  * the sponsorship of the FreeBSD Foundation.
@@ -37,6 +39,7 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/kdb.h>
 #include <sys/proc.h>
@@ -45,7 +48,7 @@
 #include <ddb/db_sym.h>
 
 #include <machine/pcb.h>
-#include <machine/riscvreg.h>
+#include <machine/loongarchreg.h>
 #include <machine/stack.h>
 #include <machine/vmparam.h>
 
@@ -83,28 +86,57 @@ db_stack_trace_cmd(struct thread *td, struct unwind_state *frame)
 			struct trapframe *tf;
 
 			tf = (struct trapframe *)(uintptr_t)frame->sp;
-			if (!__is_aligned(tf, _Alignof(struct trapframe)) ||
+			if (!__is_aligned(tf, __alignof__(*tf)) ||
 			    !kstack_contains(td, (vm_offset_t)tf,
 			    sizeof(*tf))) {
 				db_printf("--- invalid trapframe %p\n", tf);
 				break;
 			}
 
-			if ((tf->tf_scause & SCAUSE_INTR) != 0) {
-				db_printf("--- interrupt %ld\n",
-				    tf->tf_scause & SCAUSE_CODE);
-			} else if (tf->tf_scause == SCAUSE_ECALL_USER) {
-				db_printf("--- syscall");
-				db_decode_syscall(td, td->td_sa.code);
-				db_printf("\n");
+			/*
+			 * LoongArch uses ESTAT register instead of SCAUSE.
+			 * Exception code is in bits [21:16] of ESTAT.
+			 */
+			if ((tf->tf_estat & CSR_ESTAT_IS) != 0) {
+				db_printf("--- interrupt\n");
 			} else {
-				db_printf("--- exception %ld, tval = %#lx\n",
-				    tf->tf_scause & SCAUSE_CODE,
-				    tf->tf_stval);
+				uint64_t exc_code;
+
+				exc_code = (tf->tf_estat & CSR_ESTAT_EXC) >>
+				    CSR_ESTAT_EXC_SHIFT;
+				db_printf("--- exception %lu", exc_code);
+
+				switch (exc_code) {
+				case EXCCODE_TLBL:
+					db_printf(" (TLB Load)");
+					break;
+				case EXCCODE_TLBS:
+					db_printf(" (TLB Store)");
+					break;
+				case EXCCODE_ADE:
+					db_printf(" (Address Error)");
+					break;
+				case EXCCODE_ALE:
+					db_printf(" (Alignment Error)");
+					break;
+				case EXCCODE_BP:
+					db_printf(" (Breakpoint)");
+					break;
+				case EXCCODE_SYS:
+					db_printf(" (Syscall)");
+					break;
+				default:
+					break;
+				}
+
+				if (tf->tf_badvaddr != 0)
+					db_printf(", badvaddr = %#lx",
+					    tf->tf_badvaddr);
+				db_printf("\n");
 			}
 			frame->sp = tf->tf_sp;
-			frame->fp = tf->tf_s[0];
-			frame->pc = tf->tf_sepc;
+			frame->fp = tf->tf_fp;
+			frame->pc = tf->tf_era;
 			if (!INKERNEL(frame->fp))
 				break;
 			continue;
@@ -127,7 +159,7 @@ db_trace_thread(struct thread *thr, int count)
 	ctx = kdb_thr_ctx(thr);
 
 	frame.sp = ctx->pcb_sp;
-	frame.fp = ctx->pcb_s[0];
+	frame.fp = ctx->pcb_fp;
 	frame.pc = ctx->pcb_ra;
 	db_stack_trace_cmd(thr, &frame);
 	return (0);
@@ -137,12 +169,12 @@ void
 db_trace_self(void)
 {
 	struct unwind_state frame;
-	uintptr_t sp;
+	uintptr_t sp, ra;
 
-	__asm __volatile("mv %0, sp" : "=&r" (sp));
+	__asm __volatile("move %0, $sp; move %1, $ra" : "=&r" (sp), "=&r" (ra));
 
 	frame.sp = sp;
 	frame.fp = (uintptr_t)__builtin_frame_address(0);
-	frame.pc = (uintptr_t)db_trace_self;
+	frame.pc = ra;
 	db_stack_trace_cmd(curthread, &frame);
 }

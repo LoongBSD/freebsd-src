@@ -7,6 +7,6 @@
 #ifndef _SYS_SDT_MACHDEP_H_
 #define	_SYS_SDT_MACHDEP_H_
 
-#define	_SDT_ASM_PATCH_INSTR	".option push; .option norvc; nop; .option pop"
+#define	_SDT_ASM_PATCH_INSTR	"nop"
 
 #endif /* _SYS_SDT_MACHDEP_H_ */

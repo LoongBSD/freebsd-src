@@ -722,6 +722,13 @@ vm_fault_trap(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
 #endif
 	result = vm_fault(map, trunc_page(vaddr), fault_type, fault_flags,
 	    NULL);
+#ifdef __loongarch__
+	if (result != KERN_SUCCESS)
+		printf("VMFAULT-DIAG: vaddr=0x%lx ftype=%d result=%d "
+		    "pid=%d comm=%s\n",
+		    (unsigned long)vaddr, (int)fault_type, result,
+		    curproc->p_pid, curproc->p_comm);
+#endif
 	KASSERT(result == KERN_SUCCESS || result == KERN_FAILURE ||
 	    result == KERN_INVALID_ADDRESS ||
 	    result == KERN_RESOURCE_SHORTAGE ||
@@ -1580,8 +1587,15 @@ vm_fault(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
 
 	VM_CNT_INC(v_vm_faults);
 
-	if ((curthread->td_pflags & TDP_NOFAULTING) != 0)
+	if ((curthread->td_pflags & TDP_NOFAULTING) != 0) {
+#ifdef __loongarch__
+		printf("VMFAULT-DIAG: NOFAULTING vaddr=0x%lx ftype=%d "
+		    "pid=%d comm=%s\n",
+		    (unsigned long)vaddr, (int)fault_type,
+		    curproc->p_pid, curproc->p_comm);
+#endif
 		return (KERN_PROTECTION_FAILURE);
+	}
 
 	fs.vp = NULL;
 	fs.vaddr = vaddr;
@@ -1674,6 +1688,7 @@ RetryFault:
 		    ("page still set %p at loop start", fs.m));
 
 		res = vm_fault_object(&fs, &behind, &ahead);
+
 		switch (res) {
 		case FAULT_SOFT:
 			goto found;

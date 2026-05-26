@@ -1,5 +1,7 @@
 /*-
  * Copyright (c) 2015 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -34,8 +36,8 @@
 
 #include <machine/asm.h>
 ENTRY(_ctx_start)
-	jalr	s0		/* Call func from makecontext */
-	mv	a0, s1		/* Load ucp saved in makecontext */
-	call	_C_LABEL(ctx_done)
-	call	_C_LABEL(abort)
+	jr	$s0		/* Call func from makecontext */
+	move	$a0, $s1	/* Load ucp saved in makecontext */
+	bl	_C_LABEL(ctx_done)
+	bl	_C_LABEL(abort)
 END(_ctx_start)

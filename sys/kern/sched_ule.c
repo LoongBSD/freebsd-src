@@ -3234,8 +3234,22 @@ sched_throw_grab(struct tdq *tdq)
 	struct thread *newtd;
 
 	newtd = choosethread();
+#if 0	/* DEBUG: causes cnputs_mtx deadlock on SMP */
+	printf("SCHED_THROW_GRAB: CPU%d chose pid %d tid %d \"%s\" "
+	    "(curthread: pid %d tid %d \"%s\", spinlock_count=%d)\n",
+	    PCPU_GET(cpuid),
+	    newtd->td_proc->p_pid, newtd->td_tid, newtd->td_name,
+	    curthread->td_proc->p_pid, curthread->td_tid,
+	    curthread->td_name,
+	    curthread->td_md.md_spinlock_count);
+#endif
 	spinlock_enter();
 	TDQ_UNLOCK(tdq);
+#if 0	/* DEBUG: causes cnputs_mtx deadlock on SMP */
+	printf("SCHED_THROW_GRAB: after spinlock_enter+TDQ_UNLOCK "
+	    "md_spinlock_count=%d\n",
+	    curthread->td_md.md_spinlock_count);
+#endif
 	KASSERT(curthread->td_md.md_spinlock_count == 1,
 	    ("invalid count %d", curthread->td_md.md_spinlock_count));
 	return (newtd);
@@ -3252,12 +3266,29 @@ sched_ap_entry(void)
 
 	tdq = TDQ_SELF();
 
+#if 0	/* DEBUG: causes cnputs_mtx deadlock on SMP */
+	printf("SCHED_AP_ENTRY: CPU%d curthread pid %d tid %d \"%s\""
+	    " md_spinlock_count=%d\n",
+	    PCPU_GET(cpuid),
+	    curthread->td_proc->p_pid, curthread->td_tid,
+	    curthread->td_name,
+	    curthread->td_md.md_spinlock_count);
+#endif
+
 	/* This should have been setup in schedinit_ap(). */
 	THREAD_LOCKPTR_ASSERT(curthread, TDQ_LOCKPTR(tdq));
 
 	TDQ_LOCK(tdq);
+#if 0	/* DEBUG: causes cnputs_mtx deadlock on SMP */
+	printf("SCHED_AP_ENTRY: after TDQ_LOCK md_spinlock_count=%d\n",
+	    curthread->td_md.md_spinlock_count);
+#endif
 	/* Correct spinlock nesting. */
 	spinlock_exit();
+#if 0	/* DEBUG: causes cnputs_mtx deadlock on SMP */
+	printf("SCHED_AP_ENTRY: after spinlock_exit md_spinlock_count=%d\n",
+	    curthread->td_md.md_spinlock_count);
+#endif
 	PCPU_SET(switchtime, cpu_ticks());
 	PCPU_SET(switchticks, ticks);
 
@@ -3315,12 +3346,28 @@ sched_fork_exit(struct thread *td)
 	 * Finish setting up thread glue so that it begins execution in a
 	 * non-nested critical section with the scheduler lock held.
 	 */
+#if 0	/* DEBUG: causes cnputs_mtx deadlock on SMP */
+	printf("SCHED_FORK_EXIT: CPU%d pid %d tid %d \"%s\" "
+	    "md_spinlock_count=%d (before TDQ_LOCK)\n",
+	    PCPU_GET(cpuid), td->td_proc->p_pid, td->td_tid,
+	    td->td_name, td->td_md.md_spinlock_count);
+#endif
+
 	KASSERT(curthread->td_md.md_spinlock_count == 1,
 	    ("invalid count %d", curthread->td_md.md_spinlock_count));
 	cpuid = PCPU_GET(cpuid);
 	tdq = TDQ_SELF();
 	TDQ_LOCK(tdq);
+#if 0	/* DEBUG: causes cnputs_mtx deadlock on SMP */
+	printf("SCHED_FORK_EXIT: after TDQ_LOCK, md_spinlock_count=%d\n",
+	    td->td_md.md_spinlock_count);
+#endif
 	spinlock_exit();
+#if 0	/* DEBUG: causes cnputs_mtx deadlock on SMP */
+	printf("SCHED_FORK_EXIT: after spinlock_exit, md_spinlock_count=%d "
+	    "saved_crmd_ie=%ld\n",
+	    td->td_md.md_spinlock_count, td->td_md.md_saved_crmd_ie);
+#endif
 	MPASS(td->td_lock == TDQ_LOCKPTR(tdq));
 	td->td_oncpu = cpuid;
 	KTR_STATE1(KTR_SCHED, "thread", sched_tdname(td), "running",

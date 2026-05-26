@@ -1,5 +1,7 @@
 /*-
  * Copyright (c) 2014 Andrew Turner
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,6 +27,7 @@
  *
  */
 
+#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -50,7 +53,6 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 	struct iovec *iov;
 	struct vm_page m;
 	vm_page_t marr;
-	vm_prot_t prot;
 	u_int cnt;
 	int error;
 
@@ -80,16 +82,8 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 				break;
 			}
 
-			switch (uio->uio_rw) {
-			case UIO_READ:
-				prot = VM_PROT_READ;
-				break;
-			case UIO_WRITE:
-				prot = VM_PROT_WRITE;
-				break;
-			}
-
-			if (!kernacc((void *)v, cnt, prot)) {
+			if (!kernacc((void *)v, cnt, uio->uio_rw == UIO_READ ?
+			    VM_PROT_READ : VM_PROT_WRITE)) {
 				error = EFAULT;
 				break;
 			}

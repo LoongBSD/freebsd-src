@@ -228,6 +228,10 @@ prepare_elf32(dtrace_hdl_t *dtp, const dof_hdr_t *dof, dof_elf32_t *dep)
 			rel->r_offset = s->dofs_offset + dofr[j].dofr_offset;
 			rel->r_info = ELF32_R_INFO(count + dep->de_global,
 			    R_RISCV_32_PCREL);
+#elif defined(__loongarch__)
+			rel->r_offset = s->dofs_offset + dofr[j].dofr_offset;
+			rel->r_info = ELF32_R_INFO(count + dep->de_global,
+			    R_LARCH_32_PCREL);
 #else
 #error unknown ISA
 #endif
@@ -406,6 +410,10 @@ prepare_elf64(dtrace_hdl_t *dtp, const dof_hdr_t *dof, dof_elf64_t *dep)
 			rel->r_offset = s->dofs_offset + dofr[j].dofr_offset;
 			rel->r_info = ELF64_R_INFO(count + dep->de_global,
 			    R_RISCV_32_PCREL);
+#elif defined(__loongarch__)
+			rel->r_offset = s->dofs_offset + dofr[j].dofr_offset;
+			rel->r_info = ELF64_R_INFO(count + dep->de_global,
+			    R_LARCH_64_PCREL);
 #elif defined(__i386) || defined(__amd64)
 			rel->r_offset = s->dofs_offset +
 			    dofr[j].dofr_offset;
@@ -1127,6 +1135,88 @@ dt_modtext(dtrace_hdl_t *dtp, char *p, int isenabled, GElf_Rela *rela,
 		ip[3] = DT_OP_NOP;
 		ip[4] = DT_OP_NOP;
 		(*off) += 2;
+	}
+
+	return (0);
+}
+
+#elif defined(__loongarch__)
+
+/*
+	* LoongArch instruction encoding for DTrace.
+	*
+	* NOP: andi $r0, $r0,0 (0x03400000)
+	* RET: jr $ra (jirl $r0, $ra,0) =0x4c000020
+	* BL: bl offset (26-bit signed offset << 2, opcode 0x54000000)
+	* PCADDU12I+JIRL: for long calls
+	*/
+#define	DT_OP_NOP		0x03400000	/* andi $r0, $r0,0 */
+#define	DT_OP_RET		0x4c000020	/* jirl $r0, $ra,0 */
+#define	DT_OP_BL		0x54000000	/* bl instruction opcode */
+#define	DT_OP_BL_MASK		0xfc000000	/* mask for bl opcode */
+#define	DT_OP_JIRL		0x4c000000	/* jirl instruction opcode */
+#define	DT_OP_JIRL_MASK		0xfc000000	/* mask for jirl opcode */
+#define	DT_OP_PCADDU12I		0x1c000000	/* pcaddu12i instruction opcode */
+#define	DT_OP_PCADDU12I_MASK	0xfc000000	/* mask for pcaddu12i opcode */
+
+#define	DT_REL_NONE		R_LARCH_NONE
+
+static int
+dt_modtext(dtrace_hdl_t *dtp, char *p, int isenabled, GElf_Rela *rela,
+	   uint32_t *off)
+{
+	uint32_t *ip;
+
+	/*
+	 * Ensure that the offset is aligned on a 4-byte boundary.
+	 */
+	if ((rela->r_offset & (sizeof(uint32_t) - 1)) != 0)
+		return (-1);
+
+	/*
+	 * We only know about some specific relocation types.
+	 * We also recognize relocation type NONE, since that gets used for
+	 * relocations of USDT probes, and we might be re-processing a file.
+	 */
+	if (GELF_R_TYPE(rela->r_info) != R_LARCH_B26 &&
+	    GELF_R_TYPE(rela->r_info) != R_LARCH_CALL36 &&
+	    GELF_R_TYPE(rela->r_info) != R_LARCH_NONE)
+		return (-1);
+
+	ip = (uint32_t *)(p + rela->r_offset);
+
+	/*
+	 * We may have already processed this object file in an earlier linker
+	 * invocation. Check to see if the present instruction sequence matches
+	 * the one we would install below.
+	 */
+	if (ip[0] == DT_OP_NOP && (ip[1] == DT_OP_NOP || ip[1] == DT_OP_RET))
+		return (0);
+
+	/*
+	 * LoongArch uses different calling sequences:
+	 *  - bl: for short calls (26-bit offset)
+	 *  - pcaddu12i + jirl: for long calls
+	 *
+	 * For bl calls, we replace with nop + nop.
+	 * For pcaddu12i + jirl calls, we replace with nop + ret.
+	 */
+	if ((ip[0] & DT_OP_BL_MASK) == DT_OP_BL) {
+		/* This is a bl instruction, replace with nop */
+		ip[0] = DT_OP_NOP;
+	} else if ((ip[0] & DT_OP_PCADDU12I_MASK) == DT_OP_PCADDU12I &&
+	    (ip[1] & DT_OP_JIRL_MASK) == DT_OP_JIRL) {
+		/*
+		 * This is a pcaddu12i + jirl pair.
+		 * For regular probes: nop + nop
+		 * For tail calls: nop + ret
+		 */
+		ip[0] = DT_OP_NOP;
+		ip[1] = DT_OP_NOP;
+	} else {
+		dt_dprintf("found %x instead of a bl or pcaddu12i instruction at "
+		    "%llx\n", ip[0], (u_longlong_t)rela->r_offset);
+		return (-1);
 	}
 
 	return (0);

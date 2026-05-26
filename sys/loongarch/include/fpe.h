@@ -1,5 +1,8 @@
 /*-
  * Copyright (c) 2016-2024 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -40,7 +43,6 @@ void fpu_save_area_reset(struct fpreg *fsa);
 
 void fpe_enable(void);
 void fpe_disable(void);
-
 void fpe_store(struct fpreg *state);
 void fpe_restore(struct fpreg *state);
 

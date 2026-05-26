@@ -1,5 +1,8 @@
 /*-
  * Copyright (c) 2015 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Shanwei Yu <mpysw@vip.163.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -36,19 +39,20 @@
 #define	_MACHINE_UCONTEXT_H_
 
 struct gpregs {
-	__register_t	gp_ra;
-	__register_t	gp_sp;
-	__register_t	gp_gp;
-	__register_t	gp_tp;
-	__register_t	gp_t[7];
-	__register_t	gp_s[12];
-	__register_t	gp_a[8];
-	__register_t	gp_sepc;
-	__register_t	gp_sstatus;
+	__register_t	gp_regs[32];
+	__register_t	gp_crmd;
+	__register_t	gp_prmd;
+	__register_t	gp_euen;
+	__register_t	gp_misc;
+	__register_t	gp_ecfg;
+	__register_t	gp_estat;
+	__register_t	gp_era;
+	__register_t	gp_badvaddr;
+	__register_t	gp_orig_a0;
 };
 
 struct fpregs {
-	__uint64_t	fp_x[32][2];
+	__uint64_t	fp_regs[34];
 	__uint64_t	fp_fcsr;
 	int		fp_flags;
 	int		pad;

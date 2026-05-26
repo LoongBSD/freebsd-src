@@ -12,6 +12,13 @@ CFLAGS+=	-I${OBJTOP}/lib/clang/libllvm
 LIBDEPS+=	llvmminimal
 LIBPRIV=
 LIBEXT=		a
+.elif defined(TOOLS_PREFIX)
+# Cross-tools phase: use static libllvm
+LIBDEPS+=	llvm
+LIBPRIV=
+LIBEXT=		a
+LIBADD+=	z
+LIBADD+=	zstd
 .else
 LIBDEPS+=	llvm
 LIBPRIV=	private

@@ -194,6 +194,10 @@ ELFNAMEEND(check)(int fd, const char *fn __unused)
 	case EM_S390: break;
 	case EM_SPARCV9: break;
 	case EM_X86_64: break;
+#ifndef EM_LOONGARCH
+#define	EM_LOONGARCH	258
+#endif
+	case EM_LOONGARCH: break;
 /*        ELFDEFNNAME(MACHDEP_ID_CASES) */
 
         default:

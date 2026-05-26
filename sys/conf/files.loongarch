@@ -1,0 +1,138 @@
+crypto/des/des_enc.c		optional	netsmb
+dev/ofw/ofw_cpu.c		optional	fdt
+dev/ofw/ofw_pcib.c		optional 	pci fdt
+dev/pci/pci_dw.c		optional	pci fdt
+dev/pci/pci_dw_if.m		optional	pci fdt
+dev/pci/pci_host_generic.c	optional	pci
+dev/pci/pci_host_generic_acpi.c	optional	pci acpi
+dev/pci/pci_host_generic_fdt.c	optional	pci fdt
+dev/uart/uart_cpu_acpi.c		optional	uart acpi
+dev/uart/uart_cpu_fdt.c		optional	uart fdt
+dev/uart/uart_cpu_loongarch.c	optional uart
+dev/xilinx/axi_quad_spi.c	optional	xilinx_spi
+dev/xilinx/axidma.c		optional	axidma xdma
+dev/xilinx/if_xae.c		optional	xae
+dev/xilinx/xlnx_pcib.c		optional	pci fdt xlnx_pcib
+kern/msi_if.m			standard
+kern/pic_if.m			standard
+kern/subr_devmap.c		standard
+kern/subr_dummy_vdso_tc.c	standard
+kern/subr_intr.c		standard
+kern/subr_physmem.c		standard
+libkern/bcopy.c			standard
+libkern/memcmp.c		standard
+libkern/memset.c		standard
+libkern/strcmp.c		standard
+libkern/strlen.c		standard
+libkern/strncmp.c		standard
+loongarch/loongarch/autoconf.c		standard
+loongarch/loongarch/bus_machdep.c	standard
+loongarch/loongarch/bus_space_asm.S	standard
+loongarch/loongarch/busdma_bounce.c	standard
+loongarch/loongarch/busdma_machdep.c	standard
+loongarch/loongarch/cache.c		standard
+loongarch/loongarch/clock.c		standard
+loongarch/loongarch/copyinout.S		standard
+loongarch/loongarch/cpufunc_asm.S	standard
+loongarch/loongarch/db_disasm.c		optional	ddb
+loongarch/loongarch/db_interface.c	optional	ddb
+loongarch/loongarch/db_trace.c		optional	ddb
+loongarch/loongarch/dump_machdep.c	standard
+loongarch/loongarch/elf_machdep.c		standard
+loongarch/loongarch/fpe.c			standard
+loongarch/loongarch/exception.S		standard
+loongarch/loongarch/exec_machdep.c	standard
+loongarch/loongarch/gdb_machdep.c	optional	gdb
+loongarch/loongarch/intr_machdep.c		standard
+#
+# LoongArch Interrupt Controllers
+#
+# Core interrupt controllers (always required)
+loongarch/loongarch/cpuintc.c		standard
+loongarch/loongarch/eiointc.c		standard
+# PCH interrupt controllers (required for most platforms with PCI)
+loongarch/loongarch/pchpic.c		standard
+loongarch/loongarch/pchmsi.c		standard
+# Optional interrupt controllers
+loongarch/loongarch/dintc.c		optional	dintc
+# FDT-specific code
+loongarch/loongarch/eiointc_fdt.c          optional fdt
+loongarch/loongarch/locore.S		standard	no-obj
+loongarch/loongarch/machdep.c		standard
+loongarch/loongarch/minidump_machdep.c	standard
+loongarch/loongarch/mp_machdep.c	optional	smp
+loongarch/loongarch/mem.c		standard
+loongarch/loongarch/nexus.c		standard
+loongarch/loongarch/pmap.c		standard
+loongarch/loongarch/ptw_diag.c	standard
+loongarch/loongarch/ptrace_machdep.c	standard
+loongarch/loongarch/sigtramp.S		standard
+loongarch/loongarch/la64_pmc.c		optional	la64_pmc syscon fdt acpi
+loongarch/loongarch/ls7a_rtc.c		optional	ls7a_rtc fdt acpi
+loongarch/loongarch/identcpu.c		standard
+loongarch/loongarch/pci_cfgreg.c	optional	acpi
+dev/fw_cfg/fw_cfg.c		optional	fw_cfg fdt
+dev/acpica/acpi.c			optional	acpi
+dev/acpica/acpi_acad.c		optional	acpi
+dev/acpica/acpi_battery.c		optional	acpi
+dev/acpica/acpi_button.c		optional	acpi
+dev/acpica/acpi_cmbat.c		optional	acpi
+dev/acpica/acpi_container.c		optional	acpi
+dev/acpica/acpi_cpu.c		optional	acpi
+dev/acpica/acpi_dock.c		optional	acpi
+dev/acpica/acpi_ec.c		optional	acpi
+# acpi_ged.c requires GPIO event support
+#dev/acpica/acpi_ged.c		optional	acpi
+# acpi_hpet.c requires APIC which is x86-specific
+#dev/acpica/acpi_hpet.c		optional	acpi
+# acpi_isab.c requires ISA bridge support
+#dev/acpica/acpi_isab.c		optional	acpi
+# acpi_apei.c requires APEI/GHES support
+#dev/acpica/acpi_apei.c		optional	acpi
+dev/acpica/acpi_lid.c		optional	acpi
+dev/acpica/acpi_package.c		optional	acpi
+dev/acpica/acpi_pci.c		optional	acpi
+dev/acpica/acpi_pci_link.c		optional	acpi
+dev/acpica/acpi_pcib.c		optional	acpi
+dev/acpica/acpi_powerres.c		optional	acpi
+dev/acpica/acpi_pxm.c		optional	acpi
+dev/acpica/acpi_quirk.c		optional	acpi
+dev/acpica/acpi_resource.c		optional	acpi
+# acpi_smbat.c requires SMBus support
+#dev/acpica/acpi_smbat.c		optional	acpi
+# acpi_thermal.c requires thermal zone support
+#dev/acpica/acpi_thermal.c		optional	acpi
+# acpi_throttle.c requires CPU throttling support
+#dev/acpica/acpi_throttle.c		optional	acpi
+dev/acpica/acpi_timer.c		optional	acpi
+# acpi_video.c requires DRM/vt support
+#dev/acpica/acpi_video.c		optional	acpi
+dev/acpica/acpi_bus_if.m		optional	acpi
+dev/acpica/acpi_if.m			optional	acpi
+loongarch/acpica/acpi_machdep.c		optional	acpi
+loongarch/acpica/acpi_madt.c			optional	acpi
+loongarch/acpica/acpi_spcr.c			optional	acpi
+loongarch/acpica/acpi_pchmsi.c		optional	acpi
+loongarch/acpica/acpi_wakeup.c		optional	acpi
+loongarch/acpica/OsdEnvironment.c	optional	acpi
+dev/acpica/Osd/OsdDebug.c		optional	acpi
+dev/acpica/Osd/OsdHardware.c		optional	acpi
+dev/acpica/Osd/OsdInterrupt.c		optional	acpi
+dev/acpica/Osd/OsdMemory.c		optional	acpi
+dev/acpica/Osd/OsdSchedule.c		optional	acpi
+dev/acpica/Osd/OsdStream.c		optional	acpi
+dev/acpica/Osd/OsdSynch.c		optional	acpi
+dev/acpica/Osd/OsdTable.c		optional	acpi
+loongarch/loongarch/stack_machdep.c	optional	ddb | stack
+loongarch/loongarch/support.S		standard
+loongarch/loongarch/swtch.S		standard
+loongarch/loongarch/sys_machdep.c	standard
+loongarch/loongarch/trap.c		standard
+loongarch/loongarch/timer.c		standard
+loongarch/loongarch/uio_machdep.c	standard
+loongarch/loongarch/uma_machdep.c	standard
+loongarch/loongarch/unwind.c		optional	ddb | kdtrace_hooks | stack
+loongarch/loongarch/vm_machdep.c	standard
+
+# Zstd
+contrib/zstd/lib/freebsd/zstd_kfreebsd.c		optional zstdio compile-with ${ZSTD_C}

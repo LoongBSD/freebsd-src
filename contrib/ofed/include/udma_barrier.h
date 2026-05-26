@@ -108,6 +108,10 @@
 #include <sys/types.h>
 #include <machine/atomic.h>
 #define udma_to_device_barrier() fence()
+#elif defined(__loongarch__) && defined(__loongarch_lp64)
+#include <sys/types.h>
+#include <machine/atomic.h>
+#define udma_to_device_barrier() fence()
 #else
 #error No architecture specific memory barrier defines found!
 #endif
@@ -145,6 +149,8 @@
 #elif defined(__arm__)
 #define udma_from_device_barrier() dmb()
 #elif defined(__riscv)
+#define udma_from_device_barrier() fence()
+#elif defined(__loongarch__) && defined(__loongarch_lp64)
 #define udma_from_device_barrier() fence()
 #else
 #error No architecture specific memory barrier defines found!
@@ -215,6 +221,8 @@
 #elif defined(__arm__)
 #define mmio_flush_writes() dmb()
 #elif defined(__riscv)
+#define mmio_flush_writes() fence()
+#elif defined(__loongarch__) && defined(__loongarch_lp64)
 #define mmio_flush_writes() fence()
 #else
 #error No architecture specific memory barrier defines found!

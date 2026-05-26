@@ -129,7 +129,7 @@ SYSCTL_INT(_debug, OID_AUTO, __elfN(legacy_coredump), CTLFLAG_RW,
 int __elfN(nxstack) =
 #if defined(__amd64__) || defined(__powerpc64__) /* both 64 and 32 bit */ || \
     defined(__arm__) || defined(__aarch64__) || \
-    defined(__riscv)
+    defined(__riscv) || defined(__loongarch64)
 	1;
 #else
 	0;
@@ -711,8 +711,9 @@ __elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
 		error = copyout((caddr_t)sf_buf_kva(sf), (caddr_t)map_addr,
 		    copy_len);
 		vm_imgact_unmap_page(sf);
-		if (error != 0)
+		if (error != 0) {
 			return (error);
+		}
 	}
 
 	/*
@@ -873,6 +874,37 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 	*addr = base_addr;
 	*entry = (unsigned long)hdr->e_entry + rbase;
 
+#ifdef __loongarch__
+	/*
+	 * LoongArch port debug: print the LOAD segment layout of
+	 * shared objects (including ld-elf.so.1) to help diagnose
+	 * EXECUTE faults in gaps between segments.
+	 */
+	{
+		int j;
+		u_long seg_start, seg_end;
+
+		printf("ELF-LOAD: file=%s base=%#lx entry=%#lx\n",
+		    file, rbase, *entry);
+		for (j = 0; j < hdr->e_phnum; j++) {
+			if (phdr[j].p_type != PT_LOAD ||
+			    phdr[j].p_memsz == 0)
+				continue;
+			seg_start = trunc_page(phdr[j].p_vaddr + rbase);
+			seg_end = round_page(phdr[j].p_vaddr +
+			    phdr[j].p_memsz + rbase);
+			printf("ELF-LOAD:   segment[%d] vaddr=%#lx+%#lx"
+			    " -> [%#lx-%#lx) filesz=%#lx memsz=%#lx"
+			    " prot=%d\n",
+			    j, (u_long)phdr[j].p_vaddr, rbase,
+			    seg_start, seg_end,
+			    (u_long)phdr[j].p_filesz,
+			    (u_long)phdr[j].p_memsz,
+			    __elfN(trans_prot)(phdr[j].p_flags));
+		}
+	}
+#endif
+
 fail:
 	if (imgp->firstpage)
 		exec_unmap_first_page(imgp);
@@ -901,7 +933,7 @@ static int
 __CONCAT(rnd_, __elfN(base))(vm_map_t map, u_long minv, u_long maxv,
     u_int align, u_long *resp)
 {
-	u_long rbase, res;
+	u_long rbase, res, range, rounded_min;
 
 	MPASS(vm_map_min(map) <= minv);
 
@@ -910,9 +942,15 @@ __CONCAT(rnd_, __elfN(base))(vm_map_t map, u_long minv, u_long maxv,
 		return (ENOEXEC);
 	}
 
+	range = maxv - minv;
+	rounded_min = roundup(minv, (u_long)align);
+
 	arc4rand(&rbase, sizeof(rbase), 0);
-	res = roundup(minv, (u_long)align) + rbase % (maxv - minv);
+
+	res = rounded_min + rbase % range;
+
 	res &= ~((u_long)align - 1);
+
 	if (res >= maxv)
 		res -= align;
 
@@ -1338,10 +1376,13 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	if (error == 0 && imgp->et_dyn_addr == ET_DYN_ADDR_RAND) {
 		KASSERT((map->flags & MAP_ASLR) != 0,
 		    ("ET_DYN_ADDR_RAND but !MAP_ASLR"));
+		rlim_t rlimit_data = lim_max(td, RLIMIT_DATA);
+		vm_offset_t rmin = vm_map_min(map) + mapsz + rlimit_data;
+		vm_offset_t rmax = maxv / 2;
 		error = __CONCAT(rnd_, __elfN(base))(map,
-		    vm_map_min(map) + mapsz + lim_max(td, RLIMIT_DATA),
+		    rmin,
 		    /* reserve half of the address space to interpreter */
-		    maxv / 2, maxalign, &imgp->et_dyn_addr);
+		    rmax, maxalign, &imgp->et_dyn_addr);
 	}
 
 	vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
@@ -1382,6 +1423,10 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 
 	entry = (u_long)hdr->e_entry + imgp->et_dyn_addr;
 	imgp->entry_addr = entry;
+
+	printf("DEV-DEBUG: elf exec: type=%u entry=%#lx et_dyn_addr=%#lx interp=%s\n",
+	    hdr->e_type, entry, imgp->et_dyn_addr,
+	    interp != NULL ? interp : "(none)");
 
 	if (sv->sv_protect != NULL)
 		sv->sv_protect(imgp, SVP_IMAGE);

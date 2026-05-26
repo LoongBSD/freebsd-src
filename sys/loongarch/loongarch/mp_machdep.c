@@ -1,6 +1,8 @@
 /*-
  * Copyright (c) 2015 The FreeBSD Foundation
  * Copyright (c) 2016 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by Andrew Turner under
@@ -36,6 +38,7 @@
  * SUCH DAMAGE.
  */
 
+#include "opt_acpi.h"
 #include "opt_kstack_pages.h"
 #include "opt_platform.h"
 
@@ -61,7 +64,16 @@
 #include <vm/vm_map.h>
 
 #include <machine/smp.h>
-#include <machine/sbi.h>
+#include <machine/cpufunc.h>
+#include <machine/loongarchreg.h>
+
+#ifdef DEV_ACPI
+#include <contrib/dev/acpica/include/acpi.h>
+#include <contrib/dev/acpica/include/accommon.h>
+#include <contrib/dev/acpica/include/actables.h>
+#include <dev/acpica/acpivar.h>
+#include <machine/madt_var.h>
+#endif
 
 #ifdef FDT
 #include <dev/ofw/openfirm.h>
@@ -70,12 +82,15 @@
 
 #define	MP_BOOTSTACK_SIZE	(kstack_pages * PAGE_SIZE)
 
-uint32_t __riscv_boot_ap[MAXCPU];
+uint32_t __loongarch_boot_ap[MAXCPU];
 
 static enum {
 	CPUS_UNKNOWN,
 #ifdef FDT
 	CPUS_FDT,
+#endif
+#ifdef DEV_ACPI
+	CPUS_ACPI,
 #endif
 } cpu_enum_method;
 
@@ -84,22 +99,29 @@ static void ipi_hardclock(void *);
 static void ipi_preempt(void *);
 static void ipi_rendezvous(void *);
 static void ipi_stop(void *);
+static void ipi_stop_hard(void *);
+
+#ifdef DEV_ACPI
+static bool cpu_init_acpi(u_int id, u_int cpu_id);
+static void cpu_mp_late_init_acpi(void);
+#endif
 
 extern uint32_t boot_hart;
 extern cpuset_t all_harts;
 
-#ifdef INVARIANTS
+#if defined(INVARIANTS) && defined(FDT)
 static uint32_t cpu_reg[MAXCPU][2];
 #endif
 
-void mpentry(u_long hartid);
+void mpentry(u_long cpuid);
 void init_secondary(uint64_t);
 
 static struct mtx ap_boot_mtx;
 
 /* Stacks for AP initialization, discarded once idle threads are started. */
 void *bootstack;
-static void *bootstacks[MAXCPU];
+void *bootstacks[MAXCPU];
+void *bootpcpu[MAXCPU];
 
 /* Count of started APs, used to synchronize access to bootstack. */
 static volatile int aps_started;
@@ -111,10 +133,48 @@ static volatile int aps_ready;
 void *dpcpu[MAXCPU - 1];
 
 static void
+loongarch_wakeup_aps(void)
+{
+	vm_paddr_t entry_pa;
+	uint64_t val;
+	u_int cpu, hart;
+
+	entry_pa = pmap_kextract((vm_offset_t)mpentry);
+
+	CPU_FOREACH(cpu) {
+		if (cpu == 0)
+			continue;
+
+		hart = __pcpu[cpu].pc_hart;
+
+		val = IOCSR_MBUF_SEND_BLOCKING;
+		val |= (IOCSR_MBUF_SEND_BOX_HI(0) << IOCSR_MBUF_SEND_BOX_SHIFT);
+		val |= ((uint64_t)hart << IOCSR_MBUF_SEND_CPU_SHIFT);
+		val |= (entry_pa & IOCSR_MBUF_SEND_H32_MASK);
+		iocsr_write64(val, LOONGARCH_IOCSR_MBUF_SEND);
+
+		val = IOCSR_MBUF_SEND_BLOCKING;
+		val |= (IOCSR_MBUF_SEND_BOX_LO(0) << IOCSR_MBUF_SEND_BOX_SHIFT);
+		val |= ((uint64_t)hart << IOCSR_MBUF_SEND_CPU_SHIFT);
+		val |= (entry_pa << IOCSR_MBUF_SEND_BUF_SHIFT);
+		iocsr_write64(val, LOONGARCH_IOCSR_MBUF_SEND);
+
+		val = IOCSR_IPI_SEND_BLOCKING;
+		val |= ((uint64_t)hart << IOCSR_IPI_SEND_CPU_SHIFT);
+		val |= (1ULL << IOCSR_IPI_SEND_IP_SHIFT);
+		iocsr_write32((uint32_t)val, LOONGARCH_IOCSR_IPI_SEND);
+	}
+}
+
+static void
 release_aps(void *dummy __unused)
 {
-	cpuset_t mask;
 	int i;
+
+#ifdef DEV_ACPI
+	if (mp_ncpus == 1 && loongarch_num_core_pic > 1)
+		cpu_mp_late_init_acpi();
+#endif
 
 	if (mp_ncpus == 1)
 		return;
@@ -124,18 +184,15 @@ release_aps(void *dummy __unused)
 	intr_ipi_setup(IPI_PREEMPT, "preempt", ipi_preempt, NULL);
 	intr_ipi_setup(IPI_RENDEZVOUS, "rendezvous", ipi_rendezvous, NULL);
 	intr_ipi_setup(IPI_STOP, "stop", ipi_stop, NULL);
-	intr_ipi_setup(IPI_STOP_HARD, "stop hard", ipi_stop, NULL);
+	intr_ipi_setup(IPI_STOP_HARD, "stop hard", ipi_stop_hard, NULL);
 	intr_ipi_setup(IPI_HARDCLOCK, "hardclock", ipi_hardclock, NULL);
 
 	atomic_store_rel_int(&aps_ready, 1);
 
-	/* Wake up the other CPUs */
-	mask = all_harts;
-	CPU_CLR(boot_hart, &mask);
+	loongarch_wakeup_aps();
 
-	printf("Release APs\n");
-
-	sbi_send_ipi(mask.__bits);
+	if (bootverbose)
+		printf("Release APs\n");
 
 	for (i = 0; i < 2000; i++) {
 		if (atomic_load_acq_int(&smp_started))
@@ -148,29 +205,23 @@ release_aps(void *dummy __unused)
 SYSINIT(start_aps, SI_SUB_SMP, SI_ORDER_FIRST, release_aps, NULL);
 
 void
-init_secondary(uint64_t hart)
+init_secondary(uint64_t cpu_id)
 {
 	struct pcpu *pcpup;
 	u_int cpuid;
 
-	/* Renumber this cpu */
-	cpuid = hart;
+	cpuid = cpu_id;
 	if (cpuid < boot_hart)
 		cpuid += mp_maxid + 1;
 	cpuid -= boot_hart;
 
-	/* Setup the pcpu pointer */
 	pcpup = &__pcpu[cpuid];
-	__asm __volatile("mv tp, %0" :: "r"(pcpup));
+	__asm __volatile("move $r21, %0" :: "r"(pcpup));
+	__asm __volatile("csrwr %0, %1" : "+r"(pcpup) : "i"(PERCPU_BASE_KS));
 
-	/* Workaround: make sure wfi doesn't halt the hart */
-	csr_set(sie, SIE_SSIE);
-	csr_set(sip, SIE_SSIE);
-
-	/* Signal the BSP and spin until it has released all APs. */
 	atomic_add_int(&aps_started, 1);
 	while (!atomic_load_int(&aps_ready))
-		__asm __volatile("wfi");
+		__asm __volatile("idle 0");
 
 	/* Initialize curthread */
 	KASSERT(PCPU_GET(idlethread) != NULL, ("no idle thread"));
@@ -180,13 +231,19 @@ init_secondary(uint64_t hart)
 	/* Setup and enable interrupts */
 	intr_pic_init_secondary();
 
+	/* Enable all IPI types on this AP */
+	iocsr_write32(0xffffffff, LOONGARCH_IOCSR_IPI_EN);
+
+	/* Enable timer interrupt now that DPCPU and scheduler are ready.
+	 * IPI interrupt was already enabled in mpentry(). */
+	write_csr_ecfg(read_csr_ecfg() | (1 << IRQ_TI));
+
 #ifndef EARLY_AP_STARTUP
 	/* Start per-CPU event timers. */
 	cpu_initclocks_ap();
 #endif
 
-	/* Activate this hart in the kernel pmap. */
-	CPU_SET_ATOMIC(hart, &kernel_pmap->pm_active);
+	CPU_SET_ATOMIC(cpuid, &kernel_pmap->pm_active);
 
 	/* Activate process 0's pmap. */
 	pmap_activate_boot(vmspace_pmap(proc0.p_vmspace));
@@ -266,6 +323,17 @@ ipi_stop(void *dummy __unused)
 	CTR0(KTR_SMP, "IPI_STOP");
 
 	cpu = PCPU_GET(cpuid);
+
+	/*
+	 * If the kernel has already panicked, do not attempt to save
+	 * context or wait for restart.  Just spin forever to avoid
+	 * interfering with the panic dump on the winning CPU.
+	 */
+	if (KERNEL_PANICKED()) {
+		for (;;)
+			cpu_spinwait();
+	}
+
 	savectx(&stoppcbs[cpu]);
 
 	/* Indicate we are stopped */
@@ -279,11 +347,32 @@ ipi_stop(void *dummy __unused)
 	CPU_CLR_ATOMIC(cpu, &stopped_cpus);
 	CTR0(KTR_SMP, "IPI_STOP (restart)");
 
+	flush_icache();
+}
+
+static void
+ipi_stop_hard(void *dummy __unused)
+{
+	u_int cpu;
+
+	CTR0(KTR_SMP, "IPI_STOP_HARD");
+
+	cpu = PCPU_GET(cpuid);
+
 	/*
-	 * The kernel debugger might have set a breakpoint,
-	 * so flush the instruction cache.
+	 * Do NOT call savectx() here.  IPI_STOP_HARD is used during
+	 * panic/dump and must not touch memory that could corrupt the
+	 * crash dump.  Just set the stopped flag and spin.
 	 */
-	fence_i();
+	CPU_SET_ATOMIC(cpu, &stopped_cpus);
+
+	/* Wait for restart (may never happen if dumping) */
+	while (!CPU_ISSET(cpu, &started_cpus))
+		cpu_spinwait();
+
+	CPU_CLR_ATOMIC(cpu, &started_cpus);
+	CPU_CLR_ATOMIC(cpu, &stopped_cpus);
+	CTR0(KTR_SMP, "IPI_STOP_HARD (restart)");
 }
 
 static void
@@ -305,7 +394,7 @@ int
 cpu_mp_probe(void)
 {
 
-	return (mp_ncpus > 1);
+	return (1);
 }
 
 #ifdef FDT
@@ -313,12 +402,6 @@ static bool
 cpu_check_mmu(u_int id __unused, phandle_t node, u_int addr_size __unused,
     pcell_t *reg __unused)
 {
-	char type[32];
-
-	/* Check if this hart supports MMU. */
-	if (OF_getprop(node, "mmu-type", (void *)type, sizeof(type)) == -1 ||
-	    strncmp(type, "riscv,none", 10) == 0)
-		return (false);
 
 	return (true);
 }
@@ -327,11 +410,8 @@ static bool
 cpu_init_fdt(u_int id, phandle_t node, u_int addr_size, pcell_t *reg)
 {
 	struct pcpu *pcpup;
-	vm_paddr_t start_addr;
-	uint64_t hart;
+	uint64_t cpu_id;
 	u_int cpuid;
-	int naps;
-	int error;
 
 	if (!cpu_check_mmu(id, node, addr_size, reg))
 		return (false);
@@ -339,86 +419,245 @@ cpu_init_fdt(u_int id, phandle_t node, u_int addr_size, pcell_t *reg)
 	KASSERT(id < MAXCPU, ("Too many CPUs"));
 
 	KASSERT(addr_size == 1 || addr_size == 2, ("Invalid register size"));
-#ifdef INVARIANTS
+#if defined(INVARIANTS)
 	cpu_reg[id][0] = reg[0];
 	if (addr_size == 2)
 		cpu_reg[id][1] = reg[1];
 #endif
 
-	hart = reg[0];
+	cpu_id = reg[0];
 	if (addr_size == 2) {
-		hart <<= 32;
-		hart |= reg[1];
+		cpu_id <<= 32;
+		cpu_id |= reg[1];
 	}
 
-	KASSERT(hart < MAXCPU, ("Too many harts."));
+	KASSERT(cpu_id < MAXCPU, ("Too many CPUs."));
 
-	/* We are already running on this cpu */
-	if (hart == boot_hart)
+	if (cpu_id == boot_hart)
 		return (true);
 
-	/*
-	 * Rotate the CPU IDs to put the boot CPU as CPU 0.
-	 * We keep the other CPUs ordered.
-	 */
-	cpuid = hart;
+	cpuid = cpu_id;
 	if (cpuid < boot_hart)
 		cpuid += mp_maxid + 1;
 	cpuid -= boot_hart;
 
-	/* Check if we are able to start this cpu */
 	if (cpuid > mp_maxid)
 		return (false);
 
-	/*
-	 * Depending on the SBI implementation, APs are waiting either in
-	 * locore.S or to be activated explicitly, via SBI call.
-	 */
-	if (sbi_probe_extension(SBI_EXT_ID_HSM) != 0) {
-		start_addr = pmap_kextract((vm_offset_t)mpentry);
-		error = sbi_hsm_hart_start(hart, start_addr, 0);
-		if (error != 0) {
-			mp_ncpus--;
-
-			/* Send a warning to the user and continue. */
-			printf("AP %u (hart %lu) failed to start, error %d\n",
-			    cpuid, hart, error);
-			return (false);
-		}
-	}
-
 	pcpup = &__pcpu[cpuid];
 	pcpu_init(pcpup, cpuid, sizeof(struct pcpu));
-	pcpup->pc_hart = hart;
+	pcpup->pc_hart = cpu_id;
+	bootpcpu[cpuid] = pcpup;
 
 	dpcpu[cpuid - 1] = kmem_malloc(DPCPU_SIZE, M_WAITOK | M_ZERO);
 	dpcpu_init(dpcpu[cpuid - 1], cpuid);
 
 	bootstacks[cpuid] = kmem_malloc(MP_BOOTSTACK_SIZE, M_WAITOK | M_ZERO);
 
-	naps = atomic_load_int(&aps_started);
-	bootstack = (char *)bootstacks[cpuid] + MP_BOOTSTACK_SIZE;
-
 	if (bootverbose)
-		printf("Starting CPU %u (hart %lx)\n", cpuid, hart);
-	atomic_store_32(&__riscv_boot_ap[hart], 1);
-
-	/* Wait for the AP to switch to its boot stack. */
-	while (atomic_load_int(&aps_started) < naps + 1)
-		cpu_spinwait();
+		printf("Starting CPU %u (id %lx)\n", cpuid, cpu_id);
+	atomic_store_32(&__loongarch_boot_ap[cpu_id], 1);
 
 	CPU_SET(cpuid, &all_cpus);
-	CPU_SET(hart, &all_harts);
+	CPU_SET(cpu_id, &all_harts);
 
 	return (true);
 }
-#endif
+#endif /* FDT */
+
+#ifdef DEV_ACPI
+static void
+cpu_count_acpi_handler(ACPI_SUBTABLE_HEADER *entry, void *arg)
+{
+
+	if (entry->Type == ACPI_MADT_TYPE_CORE_PIC) {
+		ACPI_MADT_CORE_PIC *core;
+		core = (ACPI_MADT_CORE_PIC *)entry;
+		if ((core->Flags & ACPI_MADT_ENABLED) != 0)
+			mp_ncpus++;
+	}
+}
+
+static void
+madt_handler(ACPI_SUBTABLE_HEADER *entry, void *arg)
+{
+	ACPI_MADT_CORE_PIC *core;
+	u_int *cpuid;
+
+	if (entry->Type != ACPI_MADT_TYPE_CORE_PIC)
+		return;
+
+	core = (ACPI_MADT_CORE_PIC *)entry;
+	if ((core->Flags & ACPI_MADT_ENABLED) == 0)
+		return;
+
+	cpuid = arg;
+	cpu_init_acpi(*cpuid, core->CoreId);
+	(*cpuid)++;
+}
+
+static bool
+cpu_check_acpi(u_int id __unused, u_int cpu_id __unused)
+{
+
+	return (true);
+}
+
+static bool
+cpu_init_acpi(u_int id, u_int cpu_id)
+{
+	struct pcpu *pcpup;
+	u_int cpuid;
+
+	KASSERT(id < MAXCPU, ("Too many CPUs"));
+	KASSERT(cpu_id < MAXCPU, ("Too many CPUs."));
+
+	if (cpu_id == boot_hart)
+		return (true);
+
+	cpuid = cpu_id;
+	if (cpuid < boot_hart)
+		cpuid += mp_maxid + 1;
+	cpuid -= boot_hart;
+
+	if (cpuid > mp_maxid)
+		return (false);
+
+	pcpup = &__pcpu[cpuid];
+	pcpu_init(pcpup, cpuid, sizeof(struct pcpu));
+	pcpup->pc_hart = cpu_id;
+	bootpcpu[cpuid] = pcpup;
+
+	dpcpu[cpuid - 1] = kmem_malloc(DPCPU_SIZE, M_WAITOK | M_ZERO);
+	dpcpu_init(dpcpu[cpuid - 1], cpuid);
+
+	bootstacks[cpuid] = kmem_malloc(MP_BOOTSTACK_SIZE, M_WAITOK | M_ZERO);
+
+	if (bootverbose)
+		printf("Starting CPU %u (id %lx)\n", cpuid, (unsigned long)cpu_id);
+	atomic_store_32(&__loongarch_boot_ap[cpu_id], 1);
+
+	CPU_SET(cpuid, &all_cpus);
+	CPU_SET(cpu_id, &all_harts);
+
+	return (true);
+}
+
+static void
+cpu_mp_setmaxid_acpi(void)
+{
+	ACPI_TABLE_MADT *madt;
+	vm_paddr_t physaddr;
+
+	physaddr = acpi_find_table(ACPI_SIG_MADT);
+	if (physaddr == 0) {
+		printf("ACPI: cpu_mp_setmaxid: acpi_find_table(MADT) returned 0\n");
+		return;
+	}
+
+	madt = acpi_map_table(physaddr, ACPI_SIG_MADT);
+	if (madt == NULL) {
+		printf("ACPI: cpu_mp_setmaxid: acpi_map_table(MADT) returned NULL\n");
+		return;
+	}
+
+	mp_ncpus = 0;
+	acpi_walk_subtables(madt + 1,
+	    (char *)madt + madt->Header.Length,
+	    cpu_count_acpi_handler, NULL);
+	mp_ncpus = MIN(mp_ncpus, MAXCPU);
+	mp_maxid = mp_ncpus - 1;
+
+	printf("ACPI: cpu_mp_setmaxid: Found %d CPUs in MADT\n", mp_ncpus);
+
+	acpi_unmap_table(madt);
+}
+
+static void
+cpu_mp_start_acpi(void)
+{
+	ACPI_TABLE_MADT *madt;
+	vm_paddr_t physaddr;
+	u_int cpuid;
+
+	physaddr = acpi_find_table(ACPI_SIG_MADT);
+	if (physaddr == 0)
+		return;
+
+	madt = acpi_map_table(physaddr, ACPI_SIG_MADT);
+	if (madt == NULL) {
+		printf("Unable to map the MADT, not starting APs\n");
+		return;
+	}
+
+	cpuid = 1;
+	acpi_walk_subtables(madt + 1,
+	    (char *)madt + madt->Header.Length,
+	    madt_handler, &cpuid);
+
+	acpi_unmap_table(madt);
+}
+
+/*
+ * Late CPU enumeration using already-parsed MADT data.
+ * Called when the early cpu_mp_setmaxid_acpi() failed to find CPUs
+ * (e.g. because acpi_find_table was not ready at SI_SUB_CPU).
+ * acpi_parse_madt() has already run by this point, so loongarch_core_pic[]
+ * is populated.
+ */
+static void
+cpu_mp_late_init_acpi(void)
+{
+	int enabled_count;
+	int i;
+	u_int cpuid;
+
+	if (loongarch_num_core_pic == 0)
+		return;
+
+	enabled_count = 0;
+	for (i = 0; i < loongarch_num_core_pic; i++) {
+		if ((loongarch_core_pic[i].flags & ACPI_MADT_ENABLED) != 0)
+			enabled_count++;
+	}
+
+	if (enabled_count <= mp_ncpus)
+		return;
+
+	printf("ACPI: Late CPU detection: %d enabled CPUs from MADT (was %d)\n",
+	    enabled_count, mp_ncpus);
+
+	mp_ncpus = MIN(enabled_count, MAXCPU);
+	mp_ncores = mp_ncpus;
+	mp_maxid = mp_ncpus - 1;
+	cpu_enum_method = CPUS_ACPI;
+
+	cpuid = 1;
+	for (i = 0; i < loongarch_num_core_pic; i++) {
+		if ((loongarch_core_pic[i].flags & ACPI_MADT_ENABLED) == 0)
+			continue;
+		cpu_init_acpi(cpuid, loongarch_core_pic[i].core_id);
+		cpuid++;
+	}
+
+	{
+		u_int cpu;
+		CPU_FOREACH(cpu) {
+			if (cpu == 0)
+				continue;
+			identify_cpu(cpu);
+		}
+	}
+}
+#endif /* DEV_ACPI */
 
 /* Initialize and fire up non-boot processors */
 void
 cpu_mp_start(void)
 {
 	u_int cpu;
+
+	cpu_mp_setmaxid();
 
 	mtx_init(&ap_boot_mtx, "ap boot", NULL, MTX_SPIN);
 
@@ -429,6 +668,11 @@ cpu_mp_start(void)
 #ifdef FDT
 	case CPUS_FDT:
 		ofw_cpu_early_foreach(cpu_init_fdt, true);
+		break;
+#endif
+#ifdef DEV_ACPI
+	case CPUS_ACPI:
+		cpu_mp_start_acpi();
 		break;
 #endif
 	case CPUS_UNKNOWN:
@@ -464,23 +708,45 @@ cpu_mp_setmaxid(void)
 {
 	int cores;
 
-#ifdef FDT
-	cores = ofw_cpu_early_foreach(cpu_check_mmu, true);
-	if (cores > 0) {
-		cores = MIN(cores, MAXCPU);
-		if (bootverbose)
-			printf("Found %d CPUs in the device tree\n", cores);
-		mp_ncpus = cores;
-		mp_maxid = cores - 1;
-		cpu_enum_method = CPUS_FDT;
-	} else
-#endif
-	{
-		if (bootverbose)
-			printf("No CPU data, limiting to 1 core\n");
+	/*
+	 * Try ACPI first (ACPI preferred over FDT when both are available).
+	 * Only fall back to FDT if ACPI finds 0 CPUs.
+	 */
+	cpu_enum_method = CPUS_UNKNOWN;
+
+#ifdef DEV_ACPI
+	cpu_mp_setmaxid_acpi();
+	if (mp_ncpus > 1) {
+		cpu_enum_method = CPUS_ACPI;
+	} else if (mp_ncpus == 1) {
+		cpu_enum_method = CPUS_ACPI;
+		mp_ncpus = 1;
+		mp_maxid = 0;
+	} else {
+		/* mp_ncpus == 0: ACPI found nothing, reset and try FDT */
 		mp_ncpus = 1;
 		mp_maxid = 0;
 	}
+#endif
+#ifdef FDT
+	if (cpu_enum_method == CPUS_UNKNOWN) {
+		cores = ofw_cpu_early_foreach(cpu_check_mmu, true);
+		if (cores > 0) {
+			cores = MIN(cores, MAXCPU);
+			if (bootverbose)
+				printf("Found %d CPUs in the device tree\n", cores);
+			mp_ncpus = cores;
+			mp_maxid = cores - 1;
+			cpu_enum_method = CPUS_FDT;
+		}
+	}
+#endif
+#if !defined(FDT) && !defined(DEV_ACPI)
+	{
+		mp_ncpus = 1;
+		mp_maxid = 0;
+	}
+#endif
 
 	if (TUNABLE_INT_FETCH("hw.ncpu", &cores)) {
 		if (cores > 0 && cores < mp_ncpus) {

@@ -2,6 +2,8 @@
  * Copyright 1996-1998 John D. Polstra.
  * Copyright (c) 2015 Ruslan Bukin <br@bsdpad.com>
  * Copyright (c) 2016 Yukishige Shibata <y-shibat@mtd.biglobe.ne.jp>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -34,6 +36,7 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -102,7 +105,7 @@ INIT_SYSENTVEC(elf64_sysvec, &elf64_freebsd_sysvec);
 
 static Elf64_Brandinfo freebsd_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
-	.machine	= EM_RISCV,
+	.machine	= EM_LOONGARCH,
 	.compat_3_brand	= "FreeBSD",
 	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf64_freebsd_sysvec,
@@ -119,20 +122,10 @@ elf64_register_sysvec(void *arg)
 	struct sysentvec *sv;
 
 	sv = arg;
-	switch (pmap_mode) {
-	case PMAP_MODE_SV48:
-		sv->sv_maxuser = VM_MAX_USER_ADDRESS_SV48;
-		sv->sv_usrstack = USRSTACK_SV48;
-		sv->sv_psstrings = PS_STRINGS_SV48;
-		sv->sv_shared_page_base = SHAREDPAGE_SV48;
-		break;
-	case PMAP_MODE_SV39:
-		sv->sv_maxuser = VM_MAX_USER_ADDRESS_SV39;
-		sv->sv_usrstack = USRSTACK_SV39;
-		sv->sv_psstrings = PS_STRINGS_SV39;
-		sv->sv_shared_page_base = SHAREDPAGE_SV39;
-		break;
-	}
+	sv->sv_maxuser = VM_MAX_USER_ADDRESS;
+	sv->sv_usrstack = USRSTACK;
+	sv->sv_psstrings = PS_STRINGS;
+	sv->sv_shared_page_base = SHAREDPAGE;
 }
 SYSINIT(elf64_register_sysvec, SI_SUB_VM, SI_ORDER_ANY, elf64_register_sysvec,
     &elf64_freebsd_sysvec);
@@ -153,108 +146,83 @@ elf64_dump_thread(struct thread *td, void *dst, size_t *off)
 }
 
 /*
- * Following 4 functions are used to manipulate bits on 32bit integer value.
- * FIXME: I implemetend for ease-to-understand rather than for well-optimized.
+ * LoongArch instruction encoding helper functions.
+ *
+ * LoongArch uses fixed-width 32-bit instructions. The immediate fields
+ * are encoded in various formats depending on the instruction type.
+ */
+
+/*
+ * Extract a bit field from a 32-bit value.
+ * msb: most significant bit position of the field
+ * lsb: least significant bit position of the field
  */
 static uint32_t
-gen_bitmask(int msb, int lsb)
+extract_bits(uint32_t val, int msb, int lsb)
 {
-	uint32_t mask;
 
-	if (msb == sizeof(mask) * 8 - 1)
-		mask = ~0;
-	else
-		mask = (1U << (msb + 1)) - 1;
-
-	if (lsb > 0)
-		mask &= ~((1U << lsb) - 1);
-
-	return (mask);
-}
-
-static uint32_t
-extract_bits(uint32_t x, int msb, int lsb)
-{
-	uint32_t mask;
-
-	mask = gen_bitmask(msb, lsb);
-
-	x &= mask;
-	x >>= lsb;
-
-	return (x);
-}
-
-static uint32_t
-insert_bits(uint32_t d, uint32_t s, int msb, int lsb)
-{
-	uint32_t mask;
-
-	mask = gen_bitmask(msb, lsb);
-
-	d &= ~mask;
-
-	s <<= lsb;
-	s &= mask;
-
-	return (d | s);
-}
-
-static uint32_t
-insert_imm(uint32_t insn, uint32_t imm, int imm_msb, int imm_lsb,
-    int insn_lsb)
-{
-	int insn_msb;
-	uint32_t v;
-
-	v = extract_bits(imm, imm_msb, imm_lsb);
-	insn_msb = (imm_msb - imm_lsb) + insn_lsb;
-
-	return (insert_bits(insn, v, insn_msb, insn_lsb));
+	return ((val >> lsb) & ((1U << (msb - lsb + 1)) - 1));
 }
 
 /*
- * The RISC-V ISA is designed so that all of immediate values are
- * sign-extended.
- * An immediate value is sometimes generated at runtime by adding
- * 12bit sign integer and 20bit signed integer. This requests 20bit
- * immediate value to be ajusted if the MSB of the 12bit immediate
- * value is asserted (sign-extended value is treated as negative value).
- *
- * For example, 0x123800 can be calculated by adding upper 20 bit of
- * 0x124000 and sign-extended 12bit immediate whose bit pattern is
- * 0x800 as follows:
- *   0x123800
- *     = 0x123000 + 0x800
- *     = (0x123000 + 0x1000) + (-0x1000 + 0x800)
- *     = (0x123000 + 0x1000) + (0xff...ff800)
- *     = 0x124000            + sign-extention(0x800)
+ * Insert a value into a bit field of a 32-bit instruction.
+ * Returns the modified instruction.
  */
 static uint32_t
-calc_hi20_imm(uint32_t value)
+insert_imm(uint32_t insn, uint32_t imm, int msb, int lsb)
 {
-	/*
-	 * There is the arithmetical hack that can remove conditional
-	 * statement. But I implement it in straightforward way.
-	 */
-	if ((value & 0x800) != 0)
-		value += 0x1000;
-	return (value & ~0xfff);
+	uint32_t mask = ((1U << (msb - lsb + 1)) - 1) << lsb;
+
+	return ((insn & ~mask) | ((imm << lsb) & mask));
+}
+
+/*
+ * Sign-extend a value from a given bit width to 64 bits.
+ */
+static int64_t
+sign_extend(uint64_t val, int bits)
+{
+
+	if (val & (1ULL << (bits - 1)))
+		return (val | (~0ULL << bits));
+	return (val);
 }
 
 static const struct type2str_ent t2s[] = {
-	{ R_RISCV_NONE,		"R_RISCV_NONE"		},
-	{ R_RISCV_64,		"R_RISCV_64"		},
-	{ R_RISCV_JUMP_SLOT,	"R_RISCV_JUMP_SLOT"	},
-	{ R_RISCV_RELATIVE,	"R_RISCV_RELATIVE"	},
-	{ R_RISCV_JAL,		"R_RISCV_JAL"		},
-	{ R_RISCV_CALL,		"R_RISCV_CALL"		},
-	{ R_RISCV_PCREL_HI20,	"R_RISCV_PCREL_HI20"	},
-	{ R_RISCV_PCREL_LO12_I,	"R_RISCV_PCREL_LO12_I"	},
-	{ R_RISCV_PCREL_LO12_S,	"R_RISCV_PCREL_LO12_S"	},
-	{ R_RISCV_HI20,		"R_RISCV_HI20"		},
-	{ R_RISCV_LO12_I,	"R_RISCV_LO12_I"	},
-	{ R_RISCV_LO12_S,	"R_RISCV_LO12_S"	},
+	{ R_LARCH_NONE,		"R_LARCH_NONE"		},
+	{ R_LARCH_32,		"R_LARCH_32"		},
+	{ R_LARCH_64,		"R_LARCH_64"		},
+	{ R_LARCH_RELATIVE,	"R_LARCH_RELATIVE"	},
+	{ R_LARCH_COPY,		"R_LARCH_COPY"		},
+	{ R_LARCH_JUMP_SLOT,	"R_LARCH_JUMP_SLOT"	},
+	{ R_LARCH_IRELATIVE,	"R_LARCH_IRELATIVE"	},
+	{ R_LARCH_B16,		"R_LARCH_B16"		},
+	{ R_LARCH_B21,		"R_LARCH_B21"		},
+	{ R_LARCH_B26,		"R_LARCH_B26"		},
+	{ R_LARCH_ABS_HI20,	"R_LARCH_ABS_HI20"	},
+	{ R_LARCH_ABS_LO12,	"R_LARCH_ABS_LO12"	},
+	{ R_LARCH_ABS64_LO20,	"R_LARCH_ABS64_LO20"	},
+	{ R_LARCH_ABS64_HI12,	"R_LARCH_ABS64_HI12"	},
+	{ R_LARCH_PCALA_HI20,	"R_LARCH_PCALA_HI20"	},
+	{ R_LARCH_PCALA_LO12,	"R_LARCH_PCALA_LO12"	},
+	{ R_LARCH_PCALA64_LO20,	"R_LARCH_PCALA64_LO20"	},
+	{ R_LARCH_PCALA64_HI12,	"R_LARCH_PCALA64_HI12"	},
+	{ R_LARCH_GOT_HI20,	"R_LARCH_GOT_HI20"	},
+	{ R_LARCH_GOT_LO12,	"R_LARCH_GOT_LO12"	},
+	{ R_LARCH_GOT64_LO20,	"R_LARCH_GOT64_LO20"	},
+	{ R_LARCH_GOT64_HI12,	"R_LARCH_GOT64_HI12"	},
+	{ R_LARCH_TLS_LE_HI20,	"R_LARCH_TLS_LE_HI20"	},
+	{ R_LARCH_TLS_LE_LO12,	"R_LARCH_TLS_LE_LO12"	},
+	{ R_LARCH_TLS_IE_HI20,	"R_LARCH_TLS_IE_HI20"	},
+	{ R_LARCH_TLS_IE_LO12,	"R_LARCH_TLS_IE_LO12"	},
+	{ R_LARCH_TLS_LD_HI20,	"R_LARCH_TLS_LD_HI20"	},
+	{ R_LARCH_TLS_GD_HI20,	"R_LARCH_TLS_GD_HI20"	},
+	{ R_LARCH_32_PCREL,	"R_LARCH_32_PCREL"	},
+	{ R_LARCH_64_PCREL,	"R_LARCH_64_PCREL"	},
+	{ R_LARCH_PCREL20_S2,	"R_LARCH_PCREL20_S2"	},
+	{ R_LARCH_CALL36,	"R_LARCH_CALL36"	},
+	{ R_LARCH_ALIGN,	"R_LARCH_ALIGN"		},
+	{ R_LARCH_RELAX,	"R_LARCH_RELAX"		},
 };
 
 static const char *
@@ -262,29 +230,25 @@ reloctype_to_str(int type)
 {
 	int i;
 
-	for (i = 0; i < sizeof(t2s) / sizeof(t2s[0]); ++i) {
+	for (i = 0; i < nitems(t2s); i++) {
 		if (type == t2s[i].type)
-			return t2s[i].str;
+			return (t2s[i].str);
 	}
 
-	return "*unknown*";
+	return ("*unknown*");
 }
 
 bool
-elf_is_ifunc_reloc(Elf_Size r_info __unused)
+elf_is_ifunc_reloc(Elf_Size r_info)
 {
 
-	return (false);
+	return (ELF_R_TYPE(r_info) == R_LARCH_IRELATIVE);
 }
 
 /*
- * Currently kernel loadable module for RISCV is compiled with -fPIC option.
- * (see also additional CFLAGS definition for RISCV in sys/conf/kmod.mk)
- * Only R_RISCV_64, R_RISCV_JUMP_SLOT and RISCV_RELATIVE are emitted in
- * the module. Other relocations will be processed when kernel loadable
- * modules are built in non-PIC.
+ * Apply relocations to kernel loadable modules.
  *
- * FIXME: only RISCV64 is supported.
+ * LoongArch uses RELA relocations with explicit addends.
  */
 static int
 elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
@@ -292,14 +256,10 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 {
 	Elf_Size rtype, symidx;
 	const Elf_Rela *rela;
-	Elf_Addr val, addr;
+	Elf_Addr addr;
 	Elf64_Addr *where;
 	Elf_Addr addend;
-	uint32_t before32_1;
-	uint32_t before32;
-	uint64_t before64;
 	uint32_t *insn32p;
-	uint32_t imm20;
 	int error;
 
 	switch (type) {
@@ -313,198 +273,399 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 		break;
 	default:
 		printf("%s:%d unknown reloc type %d\n",
-		    __FUNCTION__, __LINE__, type);
+		    __func__, __LINE__, type);
 		return (-1);
 	}
 
 	switch (rtype) {
-	case R_RISCV_NONE:
+	case R_LARCH_NONE:
 		break;
 
-	case R_RISCV_64:
+	case R_LARCH_64:
 		error = lookup(lf, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
-		before64 = *where;
 		*where = addr + addend;
 		if (debug_kld)
 			printf("%p %c %-24s %016lx -> %016lx\n", where,
 			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
-			    before64, *where);
+			    (unsigned long)*where - addr - addend, *where);
 		break;
 
-	case R_RISCV_JUMP_SLOT:
+	case R_LARCH_JUMP_SLOT:
 		error = lookup(lf, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
-		before64 = *where;
 		*where = addr;
 		if (debug_kld)
-			printf("%p %c %-24s %016lx -> %016lx\n", where,
+			printf("%p %c %-24s %016lx\n", where,
 			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
-			    before64, *where);
+			    (unsigned long)*where);
 		break;
 
-	case R_RISCV_RELATIVE:
-		before64 = *where;
+	case R_LARCH_RELATIVE:
 		*where = elf_relocaddr(lf, relocbase + addend);
 		if (debug_kld)
-			printf("%p %c %-24s %016lx -> %016lx\n", where,
+			printf("%p %c %-24s %016lx\n", where,
 			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
-			    before64, *where);
+			    (unsigned long)*where);
 		break;
 
-	case R_RISCV_JAL:
-		error = lookup(lf, symidx, 1, &addr);
-		if (error != 0)
-			return (-1);
-
-		val = addr - (Elf_Addr)where;
-		if (val <= -(1UL << 20) || (1UL << 20) <= val) {
-			printf("kldload: huge offset against R_RISCV_JAL\n");
-			return (-1);
-		}
-
-		before32 = *insn32p;
-		*insn32p = insert_imm(*insn32p, val, 20, 20, 31);
-		*insn32p = insert_imm(*insn32p, val, 10,  1, 21);
-		*insn32p = insert_imm(*insn32p, val, 11, 11, 20);
-		*insn32p = insert_imm(*insn32p, val, 19, 12, 12);
-		if (debug_kld)
-			printf("%p %c %-24s %08x -> %08x\n", where,
-			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
-			    before32, *insn32p);
-		break;
-
-	case R_RISCV_CALL:
+	case R_LARCH_IRELATIVE:
 		/*
-		 * R_RISCV_CALL relocates 8-byte region that consists
-		 * of the sequence of AUIPC and JALR.
+		 * IRELATIVE relocations are handled by the runtime linker.
+		 * For kernel modules, we resolve them like RELATIVE.
 		 */
-		/* Calculate and check the pc relative offset. */
+		*where = elf_relocaddr(lf, relocbase + addend);
+		if (debug_kld)
+			printf("%p %c %-24s %016lx\n", where,
+			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
+			    (unsigned long)*where);
+		break;
+
+	case R_LARCH_B16:
+		/*
+		 * B16: PC-relative branch with 16-bit offset.
+		 * Format: offs[15:0] at bits [25:10].
+		 */
 		error = lookup(lf, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
-		val = addr - (Elf_Addr)where;
-		if (val <= -(1UL << 32) || (1UL << 32) <= val) {
-			printf("kldload: huge offset against R_RISCV_CALL\n");
+		addend = sign_extend(extract_bits(*insn32p, 25, 10), 16) << 2;
+		addr = addr - (Elf_Addr)where + addend;
+
+		if ((int64_t)addr < -(1 << 17) || (int64_t)addr >= (1 << 17)) {
+			printf("kldload: offset too large for R_LARCH_B16\n");
 			return (-1);
 		}
 
-		/* Relocate AUIPC. */
-		before32 = insn32p[0];
-		imm20 = calc_hi20_imm(val);
-		insn32p[0] = insert_imm(insn32p[0], imm20, 31, 12, 12);
-
-		/* Relocate JALR. */
-		before32_1 = insn32p[1];
-		insn32p[1] = insert_imm(insn32p[1], val, 11,  0, 20);
+		*insn32p = insert_imm(*insn32p, (addr >> 2) & 0xffff, 25, 10);
 		if (debug_kld)
-			printf("%p %c %-24s %08x %08x -> %08x %08x\n", where,
+			printf("%p %c %-24s %08x\n", where,
 			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
-			    before32, insn32p[0], before32_1, insn32p[1]);
+			    *insn32p);
 		break;
 
-	case R_RISCV_PCREL_HI20:
+	case R_LARCH_B21:
+		/*
+		 * B21: PC-relative branch with 21-bit offset.
+		 * Format: offs[20:0] split across bits [25:10] and [9:0].
+		 */
 		error = lookup(lf, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
-		val = addr - (Elf_Addr)where;
-		insn32p = (uint32_t *)where;
-		before32 = *insn32p;
-		imm20 = calc_hi20_imm(val);
-		*insn32p = insert_imm(*insn32p, imm20, 31, 12, 12);
+		addend = sign_extend(
+		    (extract_bits(*insn32p, 25, 16) << 10) |
+		    extract_bits(*insn32p, 9, 0), 20) << 2;
+		addr = addr - (Elf_Addr)where + addend;
+
+		if ((int64_t)addr < -(1 << 22) || (int64_t)addr >= (1 << 22)) {
+			printf("kldload: offset too large for R_LARCH_B21\n");
+			return (-1);
+		}
+
+		addr = (uint64_t)addr >> 2;
+		*insn32p = insert_imm(*insn32p, extract_bits(addr, 15, 0), 25, 10);
+		*insn32p = insert_imm(*insn32p, extract_bits(addr, 20, 16), 9, 5);
 		if (debug_kld)
-			printf("%p %c %-24s %08x -> %08x\n", where,
+			printf("%p %c %-24s %08x\n", where,
 			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
-			    before32, *insn32p);
+			    *insn32p);
 		break;
 
-	case R_RISCV_PCREL_LO12_I:
+	case R_LARCH_B26:
+		/*
+		 * B26: PC-relative jump with 26-bit offset.
+		 * Format: offs[25:0] split across bits [25:10] and [9:0].
+		 */
 		error = lookup(lf, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
-		val = addr - (Elf_Addr)where;
-		insn32p = (uint32_t *)where;
-		before32 = *insn32p;
-		*insn32p = insert_imm(*insn32p, addr, 11,  0, 20);
+		addend = sign_extend(
+		    (extract_bits(*insn32p, 25, 10) << 16) |
+		    extract_bits(*insn32p, 9, 0), 26) << 2;
+		addr = addr - (Elf_Addr)where + addend;
+
+		if ((int64_t)addr < -(1 << 27) || (int64_t)addr >= (1 << 27)) {
+			printf("kldload: offset too large for R_LARCH_B26\n");
+			return (-1);
+		}
+
+		addr = (uint64_t)addr >> 2;
+		*insn32p = insert_imm(*insn32p, extract_bits(addr, 15, 0), 25, 10);
+		*insn32p = insert_imm(*insn32p, extract_bits(addr, 25, 16), 9, 0);
 		if (debug_kld)
-			printf("%p %c %-24s %08x -> %08x\n", where,
+			printf("%p %c %-24s %08x\n", where,
 			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
-			    before32, *insn32p);
+			    *insn32p);
 		break;
 
-	case R_RISCV_PCREL_LO12_S:
+	case R_LARCH_ABS_HI20:
+		/*
+		 * ABS_HI20: Absolute address, high 20 bits.
+		 * Used with LU12I.W instruction.
+		 */
 		error = lookup(lf, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
-		val = addr - (Elf_Addr)where;
-		insn32p = (uint32_t *)where;
-		before32 = *insn32p;
-		*insn32p = insert_imm(*insn32p, addr, 11,  5, 25);
-		*insn32p = insert_imm(*insn32p, addr,  4,  0,  7);
+		addr += addend;
+		*insn32p = insert_imm(*insn32p, (addr >> 12) & 0xfffff, 24, 5);
 		if (debug_kld)
-			printf("%p %c %-24s %08x -> %08x\n", where,
+			printf("%p %c %-24s %08x\n", where,
 			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
-			    before32, *insn32p);
+			    *insn32p);
 		break;
 
-	case R_RISCV_HI20:
+	case R_LARCH_ABS_LO12:
+		/*
+		 * ABS_LO12: Absolute address, low 12 bits.
+		 * Used with ORI, ADDI.W, etc.
+		 */
 		error = lookup(lf, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
-		val = addr;
-		insn32p = (uint32_t *)where;
-		before32 = *insn32p;
-		imm20 = calc_hi20_imm(val);
-		*insn32p = insert_imm(*insn32p, imm20, 31, 12, 12);
+		addr += addend;
+		*insn32p = insert_imm(*insn32p, addr & 0xfff, 21, 10);
 		if (debug_kld)
-			printf("%p %c %-24s %08x -> %08x\n", where,
+			printf("%p %c %-24s %08x\n", where,
 			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
-			    before32, *insn32p);
+			    *insn32p);
 		break;
 
-	case R_RISCV_LO12_I:
+	case R_LARCH_PCALA_HI20:
+		/*
+		 * PCALA_HI20: PC-relative address, high 20 bits.
+		 * Used with PCADDU12I instruction.
+		 */
 		error = lookup(lf, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
-		val = addr;
-		insn32p = (uint32_t *)where;
-		before32 = *insn32p;
-		*insn32p = insert_imm(*insn32p, addr, 11,  0, 20);
+		addr = addr - (Elf_Addr)where + addend;
+		addr = (addr + 0x800) >> 12;	/* Adjust for sign extension */
+		*insn32p = insert_imm(*insn32p, addr & 0xfffff, 24, 5);
 		if (debug_kld)
-			printf("%p %c %-24s %08x -> %08x\n", where,
+			printf("%p %c %-24s %08x\n", where,
 			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
-			    before32, *insn32p);
+			    *insn32p);
 		break;
 
-	case R_RISCV_LO12_S:
+	case R_LARCH_PCALA_LO12:
+		/*
+		 * PCALA_LO12: PC-relative address, low 12 bits.
+		 * Used with ADDI.W, LD.W, ST.W, etc.
+		 */
 		error = lookup(lf, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
-		val = addr;
-		insn32p = (uint32_t *)where;
-		before32 = *insn32p;
-		*insn32p = insert_imm(*insn32p, addr, 11,  5, 25);
-		*insn32p = insert_imm(*insn32p, addr,  4,  0,  7);
+		addr = addr - (Elf_Addr)where + addend;
+		*insn32p = insert_imm(*insn32p, addr & 0xfff, 21, 10);
 		if (debug_kld)
-			printf("%p %c %-24s %08x -> %08x\n", where,
+			printf("%p %c %-24s %08x\n", where,
 			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
-			    before32, *insn32p);
+			    *insn32p);
 		break;
+
+	case R_LARCH_32:
+		/*
+		 * R_LARCH_32: 32-bit absolute relocation.
+		 * *(uint32_t *)PC = S + A
+		 */
+		error = lookup(lf, symidx, 1, &addr);
+		if (error != 0)
+			return (-1);
+
+		*(uint32_t *)where = (uint32_t)(addr + addend);
+		if (debug_kld)
+			printf("%p %c %-24s %08x\n", where,
+			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
+			    *(uint32_t *)where);
+		break;
+
+	case R_LARCH_32_PCREL:
+		/*
+		 * R_LARCH_32_PCREL: 32-bit PC-relative relocation.
+		 * *(uint32_t *)PC = S + A - PC
+		 */
+		error = lookup(lf, symidx, 1, &addr);
+		if (error != 0)
+			return (-1);
+
+		addr = addr - (Elf_Addr)where + addend;
+		if ((int64_t)addr < -(1LL << 31) || (int64_t)addr >= (1LL << 31)) {
+			printf("kldload: offset too large for R_LARCH_32_PCREL\n");
+			return (-1);
+		}
+		*(uint32_t *)where = (uint32_t)addr;
+		if (debug_kld)
+			printf("%p %c %-24s %08x\n", where,
+			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
+			    *(uint32_t *)where);
+		break;
+
+	case R_LARCH_64_PCREL:
+		/*
+		 * R_LARCH_64_PCREL: 64-bit PC-relative relocation.
+		 * *(uint64_t *)PC = S + A - PC
+		 */
+		error = lookup(lf, symidx, 1, &addr);
+		if (error != 0)
+			return (-1);
+
+		addr = addr - (Elf_Addr)where + addend;
+		*(uint64_t *)where = addr;
+		if (debug_kld)
+			printf("%p %c %-24s %016lx\n", where,
+			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
+			    *(uint64_t *)where);
+		break;
+
+	case R_LARCH_PCREL20_S2:
+		/*
+		 * R_LARCH_PCREL20_S2: 22-bit PC-relative offset.
+		 * Format: offs[21:2] at bits [24:5]
+		 */
+		error = lookup(lf, symidx, 1, &addr);
+		if (error != 0)
+			return (-1);
+
+		addr = addr - (Elf_Addr)where + addend;
+		if ((int64_t)addr < -(1 << 21) || (int64_t)addr >= (1 << 21)) {
+			printf("kldload: offset too large for R_LARCH_PCREL20_S2\n");
+			return (-1);
+		}
+		if ((addr & 0x3) != 0) {
+			printf("kldload: unaligned offset for R_LARCH_PCREL20_S2\n");
+			return (-1);
+		}
+		*insn32p = insert_imm(*insn32p, (addr >> 2) & 0xfffff, 24, 5);
+		if (debug_kld)
+			printf("%p %c %-24s %08x\n", where,
+			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
+			    *insn32p);
+		break;
+
+	case R_LARCH_ABS64_HI12:
+		/*
+		 * R_LARCH_ABS64_HI12: Absolute address, bits [63:52].
+		 * Used with LU52I.D instruction for 64-bit addresses.
+		 */
+		error = lookup(lf, symidx, 1, &addr);
+		if (error != 0)
+			return (-1);
+
+		addr += addend;
+		*insn32p = insert_imm(*insn32p, (addr >> 52) & 0xfff, 21, 10);
+		if (debug_kld)
+			printf("%p %c %-24s %08x\n", where,
+			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
+			    *insn32p);
+		break;
+
+	case R_LARCH_ABS64_LO20:
+		/*
+		 * R_LARCH_ABS64_LO20: Absolute address, bits [51:32].
+		 * Used with LU32I.D instruction for 64-bit addresses.
+		 */
+		error = lookup(lf, symidx, 1, &addr);
+		if (error != 0)
+			return (-1);
+
+		addr += addend;
+		*insn32p = insert_imm(*insn32p, (addr >> 32) & 0xfffff, 24, 5);
+		if (debug_kld)
+			printf("%p %c %-24s %08x\n", where,
+			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
+			    *insn32p);
+		break;
+
+	case R_LARCH_CALL36:
+		/*
+		 * R_LARCH_CALL36: 38-bit PC-relative call sequence.
+		 * Used for medium code model function call: pcaddu18i + jirl
+		 * The two instructions must be adjacent.
+		 * Format: offs[37:18] in first instruction [24:5]
+		 *         offs[17:2] in second instruction [25:10]
+		 */
+		error = lookup(lf, symidx, 1, &addr);
+		if (error != 0)
+			return (-1);
+
+		addr = addr - (Elf_Addr)where + addend;
+		if ((int64_t)addr < -(1LL << 37) || (int64_t)addr >= (1LL << 37)) {
+			printf("kldload: offset too large for R_LARCH_CALL36\n");
+			return (-1);
+		}
+		if ((addr & 0x3) != 0) {
+			printf("kldload: unaligned offset for R_LARCH_CALL36\n");
+			return (-1);
+		}
+		/* First instruction: pcaddu18i - bits [37:18] */
+		insn32p[0] = insert_imm(insn32p[0], (addr >> 18) & 0xfffff, 24, 5);
+		/* Second instruction: jirl - bits [17:2] */
+		insn32p[1] = insert_imm(insn32p[1], (addr >> 2) & 0xffff, 25, 10);
+		if (debug_kld)
+			printf("%p %c %-24s %08x %08x\n", where,
+			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
+			    insn32p[0], insn32p[1]);
+		break;
+
+	case R_LARCH_ALIGN:
+		/*
+		 * R_LARCH_ALIGN: Alignment directive.
+		 * The addend indicates the number of bytes occupied by nop
+		 * instructions. The alignment boundary is the addend
+		 * rounded up to the next power of two.
+		 * This is handled by the linker, nothing to do here.
+		 */
+		if (debug_kld)
+			printf("%p %c %-24s alignment (%ld bytes)\n", where,
+			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
+			    (long)addend);
+		break;
+
+	case R_LARCH_RELAX:
+		/*
+		 * R_LARCH_RELAX: Marker for instruction relaxation.
+		 * Paired with another relocation at the same address.
+		 * This is handled by the linker, nothing to do here.
+		 */
+		if (debug_kld)
+			printf("%p %c %-24s relaxation marker\n", where,
+			    (local ? 'l' : 'g'), reloctype_to_str(rtype));
+		break;
+
+	case R_LARCH_GOT_HI20:
+	case R_LARCH_GOT_LO12:
+	case R_LARCH_GOT64_LO20:
+	case R_LARCH_GOT64_HI12:
+	case R_LARCH_TLS_LE_HI20:
+	case R_LARCH_TLS_LE_LO12:
+	case R_LARCH_TLS_IE_HI20:
+	case R_LARCH_TLS_IE_LO12:
+	case R_LARCH_TLS_LD_HI20:
+	case R_LARCH_TLS_GD_HI20:
+		/*
+		 * GOT and TLS relocations are typically handled by the
+		 * dynamic linker. For kernel modules, these should not
+		 * appear in normal circumstances.
+		 */
+		printf("kldload: unsupported relocation type %s "
+		    "(GOT/TLS relocations require dynamic linker)\n",
+		    reloctype_to_str(rtype));
+		return (-1);
 
 	default:
 		printf("kldload: unexpected relocation type %ld, "
-		    "symbol index %ld\n", rtype, symidx);
+		    "symbol index %ld\n", (long)rtype, (long)symidx);
 		return (-1);
 	}
 

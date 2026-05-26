@@ -87,6 +87,38 @@ userret(struct thread *td, struct trapframe *frame)
 {
 	struct proc *p = td->td_proc;
 
+#if 0	/* XXX loongarch debug - disable for normal operation */
+	printf("DEBUG: userret: ENTER, td=%p, p=%p, pid=%d, comm=%s\n",
+	    td, p, p->p_pid, td->td_name);
+	printf("DEBUG: userret: frame=%p, tf_era=0x%lx, tf_sp=0x%lx tf_t0=%ld\n",
+	    frame, (unsigned long)frame->tf_era, (unsigned long)frame->tf_regs[3],
+	    (long)frame->tf_regs[12]);
+	printf("DEBUG: userret: tp=0x%lx r21=0x%lx ra=0x%lx fp=0x%lx\n",
+	    (unsigned long)frame->tf_regs[2],
+	    (unsigned long)frame->tf_regs[21],
+	    (unsigned long)frame->tf_regs[1],
+	    (unsigned long)frame->tf_regs[22]);
+	printf("DEBUG: userret: a0=0x%lx a1=0x%lx a2=0x%lx a3=0x%lx a4=0x%lx a5=0x%lx a6=0x%lx a7=0x%lx\n",
+	    (unsigned long)frame->tf_regs[4],
+	    (unsigned long)frame->tf_regs[5],
+	    (unsigned long)frame->tf_regs[6],
+	    (unsigned long)frame->tf_regs[7],
+	    (unsigned long)frame->tf_regs[8],
+	    (unsigned long)frame->tf_regs[9],
+	    (unsigned long)frame->tf_regs[10],
+	    (unsigned long)frame->tf_regs[11]);
+#ifdef __loongarch__
+	{
+		uint64_t pgdl, pgdh, asid;
+		__asm __volatile("csrrd %0, 0x19" : "=r"(pgdl));
+		__asm __volatile("csrrd %0, 0x1a" : "=r"(pgdh));
+		__asm __volatile("csrrd %0, 0x18" : "=r"(asid));
+		printf("DIAG: userret: PGDL=0x%lx PGDH=0x%lx ASID=0x%lx\n",
+		    pgdl, pgdh, asid);
+	}
+#endif
+#endif
+
 	CTR3(KTR_SYSC, "userret: thread %p (pid %d, %s)", td, p->p_pid,
             td->td_name);
 	KASSERT((p->p_flag & P_WEXIT) == 0,

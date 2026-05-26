@@ -1,5 +1,5 @@
-OUTPUT_FORMAT("elf64-littleriscv", "elf64-littleriscv", "elf64-littleriscv")
-OUTPUT_ARCH(riscv64)
+OUTPUT_FORMAT("elf64-loongarch", "elf64-loongarch", "elf64-loongarch")
+OUTPUT_ARCH(loongarch64)
 ENTRY(_start)
 SECTIONS
 {
@@ -36,11 +36,6 @@ SECTIONS
   }
   . = ALIGN(16);
   .sdata	: {
-    /*
-     * u-boot expects the gp register to be untouched by the EFI payload, so we
-     * can't enable this yet.
-     */
-    /* __global_pointer$ = . + 0x800; */
     *(.got.plt .got)
     *(.sdata .sdata.* .gnu.linkonce.s.*)
     *(dynsbss)

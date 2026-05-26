@@ -2,6 +2,8 @@
  * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2015 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2024 Xiaoqiang Zhao <zxq_yx_007@163.com>
+ * Copyright (c) 2026 Haowu Ge <gehaowu@bitmoe.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -44,24 +46,28 @@
  * This code is copied to the user's stack for returning from signal handlers
  * (see sendsig() and sigreturn()). We have to compute the address of the
  * sigcontext struct for the sigreturn call.
+ *
+ * On LoongArch, the syscall number is passed in $a7 (r11), matching
+ * the kernel's convention in cpu_fetch_syscall_args() and the
+ * LoongArch psABI.
  */
 ENTRY(sigcode)
-	mv	a0, sp
-	addi	a0, a0, SF_UC
+	move	$a0, $sp
+	addi.d	$a0, $a0, SF_UC
 
 1:
-	li	t0, SYS_sigreturn
-	ecall
+	li.d	$a7, SYS_sigreturn
+	syscall	0
 
 	/* sigreturn failed, exit */
-	li	t0, SYS_exit
-	ecall
+	li.d	$a7, SYS_exit
+	syscall	0
 
-	j	1b
+	b	1b
 END(sigcode)
 
 	/* This may be copied to the stack, keep it 16-byte aligned */
-	.align	3
+	.align	4
 esigcode:
 
 	.data
