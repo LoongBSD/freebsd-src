@@ -1,0 +1,20 @@
+04000000 csrxchg                DJUk14          @primary
+06000000 cacop                  JUd5Sk12        @orig_fmt=Ud5JSk12 @primary
+06400000 lddir                  DJUk8
+06440000 ldpte                  JUk8
+06480000 iocsrrd.b              DJ
+06480400 iocsrrd.h              DJ
+06480800 iocsrrd.w              DJ
+06481000 iocsrwr.b              DJ
+06481400 iocsrwr.h              DJ
+06481800 iocsrwr.w              DJ
+06482000 tlbclr                 EMPTY
+06482400 tlbflush               EMPTY
+06482800 tlbsrch                EMPTY           @primary
+06482c00 tlbrd                  EMPTY           @primary
+06483000 tlbwr                  EMPTY           @primary
+06483400 tlbfill                EMPTY           @primary
+06483800 eret                   EMPTY           @orig_name=ertn @primary
+06488000 idle                   Ud15            @primary
+06493000 xxx.unknown.1          EMPTY           @provisional
+06498000 tlbinv                 JKUd5           @orig_name=invtlb @orig_fmt=Ud5JK @primary
