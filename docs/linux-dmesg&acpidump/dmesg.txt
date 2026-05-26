@@ -1,0 +1,668 @@
+[    0.000000] Linux version 6.18.13-arch1-1 (linux@archlinux) (gcc (GCC) 15.2.1 20260209, GNU ld (GNU Binutils) 2.46) #1 SMP PREEMPT_DYNAMIC Fri, 27 Feb 2026 05:42:04 +0000
+[    0.000000] Loongson-64bit Processor probed (LA464 Core)
+[    0.000000] CPU0 revision is: 0014c010 (Loongson-64bit)
+[    0.000000] FPU0 revision is: 00000001
+[    0.000000] efi: EFI v2.7 by EDK II
+[    0.000000] efi: SMBIOS=0xf3e0000 SMBIOS 3.0=0xdd70000 MEMATTR=0xe68f018 ACPI=0xe14f000 ACPI 2.0=0xe14f014 INITRD=0xe144918 MEMRESERVE=0xe144998 MEMMAP=0xe140018 
+[    0.000000] ACPI: Early table checksum verification disabled
+[    0.000000] ACPI: RSDP 0x000000000E14F014 000024 (v02 BOCHS )
+[    0.000000] ACPI: XSDT 0x000000000E14E0E8 00005C (v01 BOCHS  BXPC     00000001      01000013)
+[    0.000000] ACPI: FACP 0x000000000E14B000 00010C (v05 BOCHS  BXPC     00000001 BXPC 00000001)
+[    0.000000] ACPI: DSDT 0x000000000E14C000 0011FB (v01 BOCHS  BXPC     00000001 BXPC 00000001)
+[    0.000000] ACPI: FACS 0x000000000D7B0000 000040
+[    0.000000] ACPI: APIC 0x000000000E14A000 00006C (v01 BOCHS  BXPC     00000001 BXPC 00000001)
+[    0.000000] ACPI: PPTT 0x000000000E149000 000060 (v02 BOCHS  BXPC     00000001 BXPC 00000001)
+[    0.000000] ACPI: SRAT 0x000000000E148000 000090 (v01 BOCHS  BXPC     00000001 BXPC 00000001)
+[    0.000000] ACPI: SPCR 0x000000000E147000 000050 (v02 BOCHS  BXPC     00000001 BXPC 00000001)
+[    0.000000] ACPI: MCFG 0x000000000E146000 00003C (v01 BOCHS  BXPC     00000001 BXPC 00000001)
+[    0.000000] ACPI: BGRT 0x000000000E145000 000038 (v01 INTEL  EDK2     00000002      01000013)
+[    0.000000] ACPI: SPCR: console: uart,mmio,0x1fe001e0,115200
+[    0.000000] SRAT: PXM 0 -> CPU 0x00 -> Node 0
+[    0.000000] ACPI: SRAT: Node 0 PXM 0 [mem 0x00000000-0x0fffffff]
+[    0.000000] ACPI: SRAT: Node 0 PXM 0 [mem 0x80000000-0xefffffff]
+[    0.000000] NUMA: Node 0 [mem 0x00000000-0x0fffffff] + [mem 0x80000000-0xefffffff] -> [mem 0x00000000-0xefffffff]
+[    0.000000] Node0: mem_type:4, mem_start:0x0, mem_size:0x1000 Bytes
+[    0.000000]        start_pfn:0x0, end_pfn:0x0, num_physpages:0x0
+[    0.000000] Node0: mem_type:7, mem_start:0x1000, mem_size:0xf000 Bytes
+[    0.000000]        start_pfn:0x0, end_pfn:0x4, num_physpages:0x3
+[    0.000000] Node0: mem_type:4, mem_start:0x10000, mem_size:0xa0000 Bytes
+[    0.000000]        start_pfn:0x4, end_pfn:0x2c, num_physpages:0x2b
+[    0.000000] Node0: mem_type:7, mem_start:0xb0000, mem_size:0x150000 Bytes
+[    0.000000]        start_pfn:0x2c, end_pfn:0x80, num_physpages:0x7f
+[    0.000000] Node0: mem_type:2, mem_start:0x200000, mem_size:0x2f60000 Bytes
+[    0.000000]        start_pfn:0x80, end_pfn:0xc58, num_physpages:0xc57
+[    0.000000] Node0: mem_type:7, mem_start:0x3160000, mem_size:0x32b9000 Bytes
+[    0.000000]        start_pfn:0xc58, end_pfn:0x1906, num_physpages:0x1905
+[    0.000000] Node0: mem_type:1, mem_start:0x6419000, mem_size:0x2f70000 Bytes
+[    0.000000]        start_pfn:0x1906, end_pfn:0x24e2, num_physpages:0x24e1
+[    0.000000] Node0: mem_type:2, mem_start:0x9389000, mem_size:0x2e3b000 Bytes
+[    0.000000]        start_pfn:0x24e2, end_pfn:0x3071, num_physpages:0x306f
+[    0.000000] Node0: mem_type:1, mem_start:0xc1c4000, mem_size:0x8b5000 Bytes
+[    0.000000]        start_pfn:0x3071, end_pfn:0x329e, num_physpages:0x329c
+[    0.000000] Node0: mem_type:7, mem_start:0xca79000, mem_size:0x8b6000 Bytes
+[    0.000000]        start_pfn:0x329e, end_pfn:0x34cb, num_physpages:0x34c9
+[    0.000000] Node0: mem_type:4, mem_start:0xd32f000, mem_size:0x481000 Bytes
+[    0.000000]        start_pfn:0x34cb, end_pfn:0x35ec, num_physpages:0x35e9
+[    0.000000] Node0: mem_type:7, mem_start:0xd7c0000, mem_size:0x28000 Bytes
+[    0.000000]        start_pfn:0x35f0, end_pfn:0x35fa, num_physpages:0x35f3
+[    0.000000] Node0: mem_type:3, mem_start:0xd7e8000, mem_size:0x398000 Bytes
+[    0.000000]        start_pfn:0x35fa, end_pfn:0x36e0, num_physpages:0x36d9
+[    0.000000] Resvd: mem_type:6, mem_start:0xdb80000, mem_size:0x50000 Bytes
+[    0.000000] Resvd: mem_type:5, mem_start:0xdbd0000, mem_size:0x50000 Bytes
+[    0.000000] Resvd: mem_type:6, mem_start:0xdc20000, mem_size:0x50000 Bytes
+[    0.000000] Resvd: mem_type:5, mem_start:0xdc70000, mem_size:0x50000 Bytes
+[    0.000000] Resvd: mem_type:6, mem_start:0xdcc0000, mem_size:0x50000 Bytes
+[    0.000000] Resvd: mem_type:5, mem_start:0xdd10000, mem_size:0x50000 Bytes
+[    0.000000] Resvd: mem_type:6, mem_start:0xdd60000, mem_size:0x30000 Bytes
+[    0.000000] Node0: mem_type:3, mem_start:0xdd90000, mem_size:0x60000 Bytes
+[    0.000000]        start_pfn:0x3764, end_pfn:0x377c, num_physpages:0x36f1
+[    0.000000] Resvd: mem_type:6, mem_start:0xddf0000, mem_size:0xc0000 Bytes
+[    0.000000] Resvd: mem_type:5, mem_start:0xdeb0000, mem_size:0x60000 Bytes
+[    0.000000] Node0: mem_type:3, mem_start:0xdf10000, mem_size:0xa0000 Bytes
+[    0.000000]        start_pfn:0x37c4, end_pfn:0x37ec, num_physpages:0x3719
+[    0.000000] Resvd: mem_type:6, mem_start:0xdfb0000, mem_size:0xa0000 Bytes
+[    0.000000] Resvd: mem_type:5, mem_start:0xe050000, mem_size:0x50000 Bytes
+[    0.000000] Resvd: mem_type:6, mem_start:0xe0a0000, mem_size:0x50000 Bytes
+[    0.000000] Resvd: mem_type:5, mem_start:0xe0f0000, mem_size:0x50000 Bytes
+[    0.000000] Node0: mem_type:9, mem_start:0xe140000, mem_size:0x2000 Bytes
+[    0.000000]        start_pfn:0x3850, end_pfn:0x3850, num_physpages:0x3719
+[    0.000000] Resvd: mem_type:9, mem_start:0xe140000, mem_size:0x2000 Bytes
+[    0.000000] Node0: mem_type:2, mem_start:0xe142000, mem_size:0x3000 Bytes
+[    0.000000]        start_pfn:0x3850, end_pfn:0x3851, num_physpages:0x3719
+[    0.000000] Node0: mem_type:9, mem_start:0xe145000, mem_size:0xb000 Bytes
+[    0.000000]        start_pfn:0x3851, end_pfn:0x3854, num_physpages:0x371b
+[    0.000000] Resvd: mem_type:9, mem_start:0xe145000, mem_size:0xb000 Bytes
+[    0.000000] Resvd: mem_type:6, mem_start:0xe150000, mem_size:0x50000 Bytes
+[    0.000000] Resvd: mem_type:5, mem_start:0xe1a0000, mem_size:0x50000 Bytes
+[    0.000000] Resvd: mem_type:6, mem_start:0xe1f0000, mem_size:0x50000 Bytes
+[    0.000000] Resvd: mem_type:5, mem_start:0xe240000, mem_size:0x50000 Bytes
+[    0.000000] Resvd: mem_type:6, mem_start:0xe290000, mem_size:0x50000 Bytes
+[    0.000000] Resvd: mem_type:5, mem_start:0xe2e0000, mem_size:0x50000 Bytes
+[    0.000000] Node0: mem_type:7, mem_start:0xe330000, mem_size:0x1ca000 Bytes
+[    0.000000]        start_pfn:0x38cc, end_pfn:0x393e, num_physpages:0x378d
+[    0.000000] Node0: mem_type:4, mem_start:0xe4fa000, mem_size:0xd36000 Bytes
+[    0.000000]        start_pfn:0x393e, end_pfn:0x3c8c, num_physpages:0x3ada
+[    0.000000] Node0: mem_type:3, mem_start:0xf230000, mem_size:0x180000 Bytes
+[    0.000000]        start_pfn:0x3c8c, end_pfn:0x3cec, num_physpages:0x3b3a
+[    0.000000] Resvd: mem_type:5, mem_start:0xf3b0000, mem_size:0x30000 Bytes
+[    0.000000] Resvd: mem_type:6, mem_start:0xf3e0000, mem_size:0x20000 Bytes
+[    0.000000] Node0: mem_type:7, mem_start:0xf400000, mem_size:0x26000 Bytes
+[    0.000000]        start_pfn:0x3d00, end_pfn:0x3d09, num_physpages:0x3b43
+[    0.000000] Node0: mem_type:4, mem_start:0xf426000, mem_size:0x21000 Bytes
+[    0.000000]        start_pfn:0x3d09, end_pfn:0x3d11, num_physpages:0x3b4b
+[    0.000000] Node0: mem_type:3, mem_start:0xf447000, mem_size:0x3c000 Bytes
+[    0.000000]        start_pfn:0x3d11, end_pfn:0x3d20, num_physpages:0x3b5a
+[    0.000000] Node0: mem_type:4, mem_start:0xf483000, mem_size:0xa4c000 Bytes
+[    0.000000]        start_pfn:0x3d20, end_pfn:0x3fb3, num_physpages:0x3ded
+[    0.000000] Node0: mem_type:3, mem_start:0xfecf000, mem_size:0x28000 Bytes
+[    0.000000]        start_pfn:0x3fb3, end_pfn:0x3fbd, num_physpages:0x3df7
+[    0.000000] Node0: mem_type:4, mem_start:0xfef7000, mem_size:0x109000 Bytes
+[    0.000000]        start_pfn:0x3fbd, end_pfn:0x4000, num_physpages:0x3e39
+[    0.000000] Node0: mem_type:7, mem_start:0x80000000, mem_size:0x5fc30000 Bytes
+[    0.000000]        start_pfn:0x20000, end_pfn:0x37f0c, num_physpages:0x1bd45
+[    0.000000] Node0: mem_type:2, mem_start:0xdfc30000, mem_size:0xd7d0000 Bytes
+[    0.000000]        start_pfn:0x37f0c, end_pfn:0x3b500, num_physpages:0x1f339
+[    0.000000] Node0: mem_type:1, mem_start:0xed400000, mem_size:0x2c00000 Bytes
+[    0.000000]        start_pfn:0x3b500, end_pfn:0x3c000, num_physpages:0x1fe39
+[    0.000000] Resvd: mem_type:11, mem_start:0x100d0000, mem_size:0x1000 Bytes
+[    0.000000] Resvd: mem_type:11, mem_start:0x100e0000, mem_size:0x1000 Bytes
+[    0.000000] Resvd: mem_type:11, mem_start:0x1d000000, mem_size:0x1000000 Bytes
+[    0.000000] Node0's addrspace_offset is 0x0
+[    0.000000] Node0: start_pfn=0x0, end_pfn=0x3c000
+[    0.000000] NODE_DATA(0) allocated [mem 0xefffb680-0xeffffcff]
+[    0.000000] SMBIOS 3.0.0 present.
+[    0.000000] DMI: QEMU QEMU Virtual Machine, BIOS edk2-stable202408-prebuilt.qemu.org 08/13/2024
+[    0.000000] DMI: Memory slots populated: 1/1
+[    0.000000] CpuClock = 2000000000
+[    0.000000] The BIOS Version: edk2-stable202408-prebuilt.qemu.org
+[    0.000000] software IO TLB: area num 1.
+[    0.000000] software IO TLB: mapped [mem 0x0000000006cf0000-0x000000000acf0000] (64MB)
+[    0.000000] PM: hibernation: Registered nosave memory: [mem 0x05f90000-0x05f93fff]
+[    0.000000] Detected 1 available CPU(s)
+[    0.000000] SMP: Allowing 1 CPUs, 0 hotplug CPUs
+[    0.000000] Zone ranges:
+[    0.000000]   DMA32    [mem 0x0000000000000000-0x00000000ffffffff]
+[    0.000000]   Normal   empty
+[    0.000000]   Device   empty
+[    0.000000] Movable zone start for each node
+[    0.000000] Early memory node ranges
+[    0.000000]   node   0: [mem 0x0000000000000000-0x000000000d7affff]
+[    0.000000]   node   0: [mem 0x000000000d7c0000-0x000000000db7ffff]
+[    0.000000]   node   0: [mem 0x000000000dd90000-0x000000000ddeffff]
+[    0.000000]   node   0: [mem 0x000000000df10000-0x000000000dfaffff]
+[    0.000000]   node   0: [mem 0x000000000e140000-0x000000000e14ffff]
+[    0.000000]   node   0: [mem 0x000000000e330000-0x000000000f3affff]
+[    0.000000]   node   0: [mem 0x000000000f400000-0x000000000fffffff]
+[    0.000000]   node   0: [mem 0x0000000080000000-0x00000000efffffff]
+[    0.000000] Initmem setup node 0 [mem 0x0000000000000000-0x00000000efffffff]
+[    0.000000] On node 0, zone DMA32: 4 pages in unavailable ranges
+[    0.000000] On node 0, zone DMA32: 132 pages in unavailable ranges
+[    0.000000] On node 0, zone DMA32: 72 pages in unavailable ranges
+[    0.000000] On node 0, zone DMA32: 100 pages in unavailable ranges
+[    0.000000] On node 0, zone DMA32: 120 pages in unavailable ranges
+[    0.000000] On node 0, zone DMA32: 20 pages in unavailable ranges
+[    0.000000] On node 0, zone DMA32: 16384 pages in unavailable ranges
+[    0.000000] On node 0, zone DMA32: 16384 pages in unavailable ranges
+[    0.000000] percpu: Embedded 9 pages/cpu s97560 r8192 d41704 u33554432
+[    0.000000] pcpu-alloc: s97560 r8192 d41704 u33554432 alloc=1*33554432
+[    0.000000] pcpu-alloc: [0] 0 
+[    0.000000] Kernel command line: BOOT_IMAGE=/arch/boot/loong64/vmlinuz-linux archisobasedir=arch archisosearchuuid=2026-03-01-12-46-49-00 archisolabel=ARCH_202603 arch=loong64
+[    0.000000] Unknown kernel command line parameters "archisobasedir=arch archisosearchuuid=2026-03-01-12-46-49-00 archisolabel=ARCH_202603 arch=loong64", will be passed to user space.
+[    0.000000] printk: log buffer data + meta data: 131072 + 458752 = 589824 bytes
+[    0.000000] Dentry cache hash table entries: 262144 (order: 7, 2097152 bytes, linear)
+[    0.000000] Inode-cache hash table entries: 131072 (order: 6, 1048576 bytes, linear)
+[    0.000000] Fallback order for Node 0: 0 
+[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 130624
+[    0.000000] Policy zone: DMA32
+[    0.000000] mem auto-init: stack:all(zero), heap alloc:on, heap free:off
+[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
+[    0.000000] ftrace: allocating 50784 entries in 50 pages
+[    0.000000] ftrace: allocated 50 pages with 3 groups
+[    0.000000] Dynamic Preempt: full
+[    0.000000] rcu: Preemptible hierarchical RCU implementation.
+[    0.000000] rcu: 	RCU restricting CPUs from NR_CPUS=2048 to nr_cpu_ids=1.
+[    0.000000] rcu: 	RCU priority boosting: priority 1 delay 500 ms.
+[    0.000000] 	Trampoline variant of Tasks RCU enabled.
+[    0.000000] 	Rude variant of Tasks RCU enabled.
+[    0.000000] 	Tracing variant of Tasks RCU enabled.
+[    0.000000] rcu: RCU calculated value of scheduler-enlistment delay is 100 jiffies.
+[    0.000000] rcu: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=1
+[    0.000000] RCU Tasks: Setting shift to 0 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=1.
+[    0.000000] RCU Tasks Rude: Setting shift to 0 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=1.
+[    0.000000] RCU Tasks Trace: Setting shift to 0 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=1.
+[    0.000000] NR_IRQS: 526400, nr_irqs: 320, preallocated irqs: 16
+[    0.000000] rcu: srcu_init: Setting srcu_struct sizes based on contention.
+[    0.000000] Constant clock event device register
+[    0.000000] clocksource: Constant: mask: 0xffffffffffffffff max_cycles: 0x171024e7e0, max_idle_ns: 440795205315 ns
+[    0.000082] sched_clock: 64 bits at 100MHz, resolution 10ns, wraps every 4398046511100ns
+[    0.000182] Constant clock source device register
+[    0.004291] kfence: initialized - using 8388608 bytes for 255 objects at 0x(____ptrval____)-0x(____ptrval____)
+[    0.013904] Console: colour dummy device 80x25
+[    0.014763] printk: legacy console [tty0] enabled
+[    0.025211] ACPI: Core revision 20250807
+[    0.035385] Calibrating delay loop (skipped), value calculated using timer frequency.. 200.00 BogoMIPS (lpj=100000)
+[    0.035909] pid_max: default: 32768 minimum: 301
+[    0.045380] LSM: initializing lsm=capability,landlock,lockdown,yama,bpf
+[    0.053823] landlock: Up and running.
+[    0.053892] Yama: becoming mindful.
+[    0.054322] LSM support for eBPF active
+[    0.058364] Mount-cache hash table entries: 4096 (order: 1, 32768 bytes, linear)
+[    0.058415] Mountpoint-cache hash table entries: 4096 (order: 1, 32768 bytes, linear)
+[    0.133190] rcu: Hierarchical SRCU implementation.
+[    0.133270] rcu: 	Max phase no-delay instances is 400.
+[    0.140970] smp: Bringing up secondary CPUs ...
+[    0.142656] smp: Brought up 1 node, 1 CPU
+[    0.151663] Memory: 1702848K/2089984K available (20224K kernel code, 12546K rwdata, 13160K rodata, 1280K init, 1123K bss, 382672K reserved, 0K cma-reserved)
+[    0.161881] devtmpfs: initialized
+[    0.177851] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 1911260446275000 ns
+[    0.178036] posixtimers hash table entries: 512 (order: 0, 8192 bytes, linear)
+[    0.178576] futex hash table entries: 256 (16384 bytes on 1 NUMA nodes, total 16 KiB, linear).
+[    0.191690] pinctrl core: initialized pinctrl subsystem
+[    0.210582] NET: Registered PF_NETLINK/PF_ROUTE protocol family
+[    0.215300] audit: initializing netlink subsys (disabled)
+[    0.217645] audit: type=2000 audit(0.114:1): state=initialized audit_enabled=0 res=1
+[    0.224506] thermal_sys: Registered thermal governor 'fair_share'
+[    0.224582] thermal_sys: Registered thermal governor 'bang_bang'
+[    0.224659] thermal_sys: Registered thermal governor 'step_wise'
+[    0.224678] thermal_sys: Registered thermal governor 'user_space'
+[    0.224688] thermal_sys: Registered thermal governor 'power_allocator'
+[    0.225228] Final SIMD width = 256
+[    0.226464] hw-breakpoint: Found 0 breakpoint and 0 watchpoint registers.
+[    0.226769] acpiphp: ACPI Hot Plug PCI Controller Driver version: 0.5
+[    0.276352] HugeTLB: registered 32.0 MiB page size, pre-allocated 0 pages
+[    0.276411] HugeTLB: 0 KiB vmemmap can be freed for a 32.0 MiB page
+[    0.409783] raid6: skipped pq benchmark and selected lasx
+[    0.410009] raid6: using lasx recovery algorithm
+[    0.416109] ACPI: Added _OSI(Module Device)
+[    0.416151] ACPI: Added _OSI(Processor Device)
+[    0.416164] ACPI: Added _OSI(Processor Aggregator Device)
+[    0.469053] ACPI: 1 ACPI AML tables successfully acquired and loaded
+[    0.483513] ACPI: Interpreter enabled
+[    0.484997] ACPI: PM: (supports S0 S5)
+[    0.485068] ACPI: Using LPIC for interrupt routing
+[    0.485992] ACPI: MCFG table detected, 1 entries
+[    0.525533] ACPI: PCI: Interrupt link L000 configured for IRQ 80
+[    0.525769] ACPI: PCI: Interrupt link L001 configured for IRQ 81
+[    0.525869] ACPI: PCI: Interrupt link L002 configured for IRQ 82
+[    0.525968] ACPI: PCI: Interrupt link L003 configured for IRQ 83
+[    0.526479] ACPI: PCI Root Bridge [PCI0] (domain 0000 [bus 00-7f])
+[    0.527357] acpi PNP0A08:00: _OSC: OS supports [ExtendedConfig ASPM ClockPM Segments MSI EDR HPX-Type3]
+[    0.530724] acpi PNP0A08:00: _OSC: platform does not support [PCIeHotplug LTR DPC]
+[    0.532286] acpi PNP0A08:00: _OSC: OS now controls [SHPCHotplug PME AER PCIeCapability]
+[    0.533028] acpi PNP0A08:00: ECAM at [mem 0x20000000-0x27ffffff] for [bus 00-7f]
+[    0.534402] ACPI: Remapped I/O 0x0000000018004000 to [io  0x0000-0xbfff window]
+[    0.537865] PCI host bridge to bus 0000:00
+[    0.538531] pci_bus 0000:00: root bus resource [io  0x0000-0xbfff window]
+[    0.538580] pci_bus 0000:00: root bus resource [mem 0x40000000-0x7fffffff window]
+[    0.538709] pci_bus 0000:00: root bus resource [bus 00-7f]
+[    0.543141] pci 0000:00:00.0: [1b36:0008] type 00 class 0x060000 conventional PCI endpoint
+[    0.548740] pci 0000:00:01.0: [1af4:1000] type 00 class 0x020000 conventional PCI endpoint
+[    0.549900] pci 0000:00:01.0: BAR 0 [io  0x4100-0x411f]
+[    0.550000] pci 0000:00:01.0: BAR 1 [mem 0x40057000-0x40057fff]
+[    0.550061] pci 0000:00:01.0: BAR 4 [mem 0x4004c000-0x4004ffff 64bit pref]
+[    0.550259] pci 0000:00:01.0: ROM [mem 0xfffc0000-0xffffffff pref]
+[    0.551089] pci 0000:00:02.0: [1af4:1050] type 00 class 0x038000 conventional PCI endpoint
+[    0.551882] pci 0000:00:02.0: BAR 1 [mem 0x40056000-0x40056fff]
+[    0.551942] pci 0000:00:02.0: BAR 4 [mem 0x40048000-0x4004bfff 64bit pref]
+[    0.553007] pci 0000:00:03.0: [1af4:1001] type 00 class 0x010000 conventional PCI endpoint
+[    0.553424] pci 0000:00:03.0: BAR 0 [io  0x4080-0x40ff]
+[    0.553472] pci 0000:00:03.0: BAR 1 [mem 0x40055000-0x40055fff]
+[    0.553493] pci 0000:00:03.0: BAR 4 [mem 0x40044000-0x40047fff 64bit pref]
+[    0.554338] pci 0000:00:04.0: [1af4:1001] type 00 class 0x010000 conventional PCI endpoint
+[    0.554755] pci 0000:00:04.0: BAR 0 [io  0x4000-0x407f]
+[    0.554796] pci 0000:00:04.0: BAR 1 [mem 0x40054000-0x40054fff]
+[    0.554816] pci 0000:00:04.0: BAR 4 [mem 0x40040000-0x40043fff 64bit pref]
+[    0.556345] pci 0000:00:1b.0: [1033:0194] type 00 class 0x0c0330 PCIe Root Complex Integrated Endpoint
+[    0.556414] pci 0000:00:1b.0: BAR 0 [mem 0x40050000-0x40053fff 64bit]
+[    0.556782] pci 0000:00:1b.0: enabling Extended Tags
+[    0.559995] pci 0000:00:01.0: ROM [mem 0x40000000-0x4003ffff pref]: assigned
+[    0.560379] pci 0000:00:01.0: BAR 4 [mem 0x40040000-0x40043fff 64bit pref]: assigned
+[    0.560701] pci 0000:00:02.0: BAR 4 [mem 0x40044000-0x40047fff 64bit pref]: assigned
+[    0.561389] pci 0000:00:03.0: BAR 4 [mem 0x40048000-0x4004bfff 64bit pref]: assigned
+[    0.561455] pci 0000:00:04.0: BAR 4 [mem 0x4004c000-0x4004ffff 64bit pref]: assigned
+[    0.561485] pci 0000:00:1b.0: BAR 0 [mem 0x40050000-0x40053fff 64bit]: assigned
+[    0.561520] pci 0000:00:01.0: BAR 1 [mem 0x40054000-0x40054fff]: assigned
+[    0.561556] pci 0000:00:02.0: BAR 1 [mem 0x40055000-0x40055fff]: assigned
+[    0.561891] pci 0000:00:03.0: BAR 1 [mem 0x40056000-0x40056fff]: assigned
+[    0.561932] pci 0000:00:04.0: BAR 1 [mem 0x40057000-0x40057fff]: assigned
+[    0.561965] pci 0000:00:03.0: BAR 0 [io  0x4000-0x407f]: assigned
+[    0.562480] pci 0000:00:04.0: BAR 0 [io  0x4080-0x40ff]: assigned
+[    0.562887] pci 0000:00:01.0: BAR 0 [io  0x4100-0x411f]: assigned
+[    0.563333] pci_bus 0000:00: resource 4 [io  0x0000-0xbfff window]
+[    0.563380] pci_bus 0000:00: resource 5 [mem 0x40000000-0x7fffffff window]
+[    0.569368] iommu: Default domain type: Translated
+[    0.569431] iommu: DMA domain TLB invalidation policy: lazy mode
+[    0.573786] SCSI subsystem initialized
+[    0.575064] libata version 3.00 loaded.
+[    0.575635] ACPI: bus type USB registered
+[    0.576306] usbcore: registered new interface driver usbfs
+[    0.576714] usbcore: registered new interface driver hub
+[    0.576877] usbcore: registered new device driver usb
+[    0.577805] EDAC MC: Ver: 3.0.0
+[    0.581890] efivars: Registered efivars operations
+[    0.598757] NetLabel: Initializing
+[    0.598796] NetLabel:  domain hash size = 128
+[    0.598816] NetLabel:  protocols = UNLABELED CIPSOv4 CALIPSO
+[    0.599922] NetLabel:  unlabeled traffic allowed by default
+[    0.600014] mctp: management component transport protocol core
+[    0.600036] NET: Registered PF_MCTP protocol family
+[    0.605849] vgaarb: loaded
+[    0.608802] clocksource: Switched to clocksource Constant
+[    0.631648] VFS: Disk quotas dquot_6.6.0
+[    0.632281] VFS: Dquot-cache hash table entries: 2048 (order 0, 16384 bytes)
+[    0.636511] pnp: PnP ACPI init
+[    0.642143] system 00:04: [mem 0x20000000-0x27ffffff window] could not be reserved
+[    0.642862] pnp: PnP ACPI: found 5 devices
+[    0.669870] NET: Registered PF_INET protocol family
+[    0.672255] IP idents hash table entries: 32768 (order: 4, 262144 bytes, linear)
+[    0.738688] tcp_listen_portaddr_hash hash table entries: 1024 (order: 0, 16384 bytes, linear)
+[    0.738817] Table-perturb hash table entries: 65536 (order: 4, 262144 bytes, linear)
+[    0.738921] TCP established hash table entries: 16384 (order: 3, 131072 bytes, linear)
+[    0.739256] TCP bind hash table entries: 16384 (order: 5, 524288 bytes, linear)
+[    0.739669] TCP: Hash tables configured (established 16384 bind 16384)
+[    0.742495] MPTCP token hash table entries: 2048 (order: 2, 49152 bytes, linear)
+[    0.742961] UDP hash table entries: 1024 (order: 2, 65536 bytes, linear)
+[    0.743325] UDP-Lite hash table entries: 1024 (order: 2, 65536 bytes, linear)
+[    0.746138] NET: Registered PF_UNIX/PF_LOCAL protocol family
+[    0.747077] NET: Registered PF_XDP protocol family
+[    0.748011] pci 0000:00:1b.0: enabling device (0000 -> 0002)
+[    0.749354] PCI: CLS 0 bytes, default 64
+[    0.758694] Trying to unpack rootfs image as initramfs...
+[    0.986313] Initialise system trusted keyrings
+[    0.990938] Key type blacklist registered
+[    0.994220] workingset: timestamp_bits=40 max_order=17 bucket_order=0
+[    1.071811] fuse: init (API version 7.45)
+[    1.080763] integrity: Platform Keyring initialized
+[    1.081008] integrity: Machine keyring initialized
+[    1.209504] xor: measuring software checksum speed
+[    1.211049]    8regs           :  2314 MB/sec
+[    1.215737]    8regs_prefetch  :  1908 MB/sec
+[    1.217143]    32regs          :  2424 MB/sec
+[    1.222567]    32regs_prefetch :  1696 MB/sec
+[    1.224092]    lsx             :  2270 MB/sec
+[    1.227718]    lasx            :  2140 MB/sec
+[    1.227799] xor: using function: 32regs (2424 MB/sec)
+[    1.227863] Key type asymmetric registered
+[    1.228010] Asymmetric key parser 'x509' registered
+[    1.231049] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 245)
+[    1.232150] io scheduler mq-deadline registered
+[    1.232234] io scheduler kyber registered
+[    1.232638] io scheduler bfq registered
+[    1.237698] ledtrig-cpu: registered to indicate activity on CPUs
+[    1.253156] input: Power Button as /devices/LNXSYSTM:00/PNP0C0C:00/input/input0
+[    1.254411] ACPI: button: Power Button [PWRB]
+[    1.272888] ACPI: \L001: Enabled at IRQ 81
+[    1.273987] virtio-pci 0000:00:01.0: enabling device (0005 -> 0007)
+[    1.282242] ACPI: \L002: Enabled at IRQ 82
+[    1.292465] ACPI: \L003: Enabled at IRQ 83
+[    1.292757] virtio-pci 0000:00:03.0: enabling device (0005 -> 0007)
+[    1.296540] ACPI: \L000: Enabled at IRQ 80
+[    1.301399] virtio-pci 0000:00:04.0: enabling device (0005 -> 0007)
+[    1.305225] Serial: 8250/16550 driver, 32 ports, IRQ sharing enabled
+[    1.317650] 00:00: ttyS0 at MMIO 0x1fe001e0 (irq = 20, base_baud = 115200) is a 16550A
+[    1.329078] 00:01: ttyS1 at MMIO 0x1fe002e0 (irq = 21, base_baud = 115200) is a 16550A
+[    1.334490] 00:02: ttyS2 at MMIO 0x1fe003e0 (irq = 22, base_baud = 115200) is a 16550A
+[    1.339117] 00:03: ttyS3 at MMIO 0x1fe004e0 (irq = 23, base_baud = 115200) is a 16550A
+[    1.391881] ACPI: bus type drm_connector registered
+[    1.397903] virtio_blk virtio2: 1/0/0 default/read/poll queues
+[    1.435740] virtio_blk virtio2: [vda] 2773168 512-byte logical blocks (1.42 GB/1.32 GiB)
+[    1.495012]  vda: vda1 vda2
+[    1.503290] virtio_blk virtio3: 1/0/0 default/read/poll queues
+[    1.504484] virtio_blk virtio3: [vdb] 10485760 512-byte logical blocks (5.37 GB/5.00 GiB)
+[    1.527757] xhci_hcd 0000:00:1b.0: xHCI Host Controller
+[    1.528331] xhci_hcd 0000:00:1b.0: new USB bus registered, assigned bus number 1
+[    1.539861] xhci_hcd 0000:00:1b.0: hcc params 0x00087001 hci version 0x100 quirks 0x0000000000000014
+[    1.549404] xhci_hcd 0000:00:1b.0: xHCI Host Controller
+[    1.549550] xhci_hcd 0000:00:1b.0: new USB bus registered, assigned bus number 2
+[    1.550011] xhci_hcd 0000:00:1b.0: Host supports USB 3.0 SuperSpeed
+[    1.561684] usb usb1: New USB device found, idVendor=1d6b, idProduct=0002, bcdDevice= 6.18
+[    1.561738] usb usb1: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[    1.561770] usb usb1: Product: xHCI Host Controller
+[    1.561801] usb usb1: Manufacturer: Linux 6.18.13-arch1-1 xhci-hcd
+[    1.561831] usb usb1: SerialNumber: 0000:00:1b.0
+[    1.570662] hub 1-0:1.0: USB hub found
+[    1.574084] hub 1-0:1.0: 4 ports detected
+[    1.586195] usb usb2: We don't know the algorithms for LPM for this host, disabling LPM.
+[    1.586873] usb usb2: New USB device found, idVendor=1d6b, idProduct=0003, bcdDevice= 6.18
+[    1.586898] usb usb2: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[    1.586912] usb usb2: Product: xHCI Host Controller
+[    1.586924] usb usb2: Manufacturer: Linux 6.18.13-arch1-1 xhci-hcd
+[    1.586936] usb usb2: SerialNumber: 0000:00:1b.0
+[    1.589706] hub 2-0:1.0: USB hub found
+[    1.590240] hub 2-0:1.0: 4 ports detected
+[    1.595259] usbcore: registered new interface driver usbserial_generic
+[    1.595515] usbserial: USB Serial support registered for generic
+[    1.596686] i8042: PNP: No PS/2 controller found.
+[    1.605957] hid: raw HID events driver (C) Jiri Kosina
+[    1.609100] usbcore: registered new interface driver usbhid
+[    1.609144] usbhid: USB HID core driver
+[    1.609179] Loongson Hwmon Enter...
+[    1.609849] Initial CPU temperature is 0 (highest).
+[    1.610239] rust_binder: Loaded Rust Binder.
+[    1.611062] drop_monitor: Initializing network drop monitor service
+[    1.617680] NET: Registered PF_INET6 protocol family
+[    1.640168] Segment Routing with IPv6
+[    1.640270] RPL Segment Routing with IPv6
+[    1.640591] In-situ OAM (IOAM) with IPv6
+[    1.644495] NET: Registered PF_PACKET protocol family
+[    1.725183] registered taskstats version 1
+[    1.733180] Loading compiled-in X.509 certificates
+[    1.832171] usb 1-1: new high-speed USB device number 2 using xhci_hcd
+[    1.968533] usb 1-1: New USB device found, idVendor=0627, idProduct=0001, bcdDevice= 0.00
+[    1.968609] usb 1-1: New USB device strings: Mfr=1, Product=3, SerialNumber=10
+[    1.968625] usb 1-1: Product: QEMU USB Tablet
+[    1.968639] usb 1-1: Manufacturer: QEMU
+[    1.968650] usb 1-1: SerialNumber: 28754-0000:00:1b.0-1
+[    1.994835] input: QEMU QEMU USB Tablet as /devices/pci0000:00/0000:00:1b.0/usb1/1-1/1-1:1.0/0003:0627:0001.0001/input/input1
+[    1.998443] hid-generic 0003:0627:0001.0001: input,hidraw0: USB HID v0.01 Mouse [QEMU QEMU USB Tablet] on usb-0000:00:1b.0-1/input0
+[    2.114078] usb 1-2: new high-speed USB device number 3 using xhci_hcd
+[    2.239230] usb 1-2: New USB device found, idVendor=0627, idProduct=0001, bcdDevice= 0.00
+[    2.239279] usb 1-2: New USB device strings: Mfr=1, Product=4, SerialNumber=11
+[    2.239295] usb 1-2: Product: QEMU USB Keyboard
+[    2.239308] usb 1-2: Manufacturer: QEMU
+[    2.239319] usb 1-2: SerialNumber: 68284-0000:00:1b.0-2
+[    2.249084] input: QEMU QEMU USB Keyboard as /devices/pci0000:00/0000:00:1b.0/usb1/1-2/1-2:1.0/0003:0627:0001.0002/input/input2
+[    2.311881] hid-generic 0003:0627:0001.0002: input,hidraw1: USB HID v1.11 Keyboard [QEMU QEMU USB Keyboard] on usb-0000:00:1b.0-2/input0
+[    6.577332] Freeing initrd memory: 220944K
+[    6.954328] Loaded X.509 cert 'Build time autogenerated kernel key: 494bd55b7e4163334168b9503a812d858e39e719'
+[    7.001921] zswap: loaded using pool zstd
+[    7.003851] Demotion targets for Node 0: null
+[    7.006660] Key type .fscrypt registered
+[    7.006695] Key type fscrypt-provisioning registered
+[    7.015505] Btrfs loaded, zoned=yes, fsverity=yes
+[    7.016787] Key type big_key registered
+[    7.051307] clk: Disabling unused clocks
+[    7.051751] PM: genpd: Disabling unused power domains
+[    7.114688] Freeing unused kernel image (initmem) memory: 1280K
+[    7.114806] This architecture does not have kernel memory protection.
+[    7.115055] Run /init as init process
+[    7.115130]   with arguments:
+[    7.115175]     /init
+[    7.115205]   with environment:
+[    7.115230]     HOME=/
+[    7.115252]     TERM=linux
+[    7.115263]     archisobasedir=arch
+[    7.115273]     archisosearchuuid=2026-03-01-12-46-49-00
+[    7.115403]     archisolabel=ARCH_202603
+[    7.115415]     arch=loong64
+[    8.086063] fbcon: Taking over console
+[   15.590867] [drm] pci: virtio-gpu-pci detected at 0000:00:02.0
+[   15.603010] [drm] features: -virgl +edid -resource_blob -host_visible
+[   15.603066] [drm] features: -context_init
+[   15.613774] [drm] number of scanouts: 1
+[   15.613847] [drm] number of cap sets: 0
+[   15.732894] virtio-pci 0000:00:02.0: [drm] Registered 1 planes with drm panic
+[   15.732979] [drm] Initialized virtio_gpu 0.1.0 for 0000:00:02.0 on minor 0
+[   15.966265] Console: switching to colour frame buffer device 80x30
+[   16.037723] virtio-pci 0000:00:02.0: [drm] fb0: virtio_gpudrmfb frame buffer device
+[   21.829128] ISO 9660 Extensions: Microsoft Joliet Level 3
+[   21.836304] ISO 9660 Extensions: RRIP_1991A
+[   22.899529] loop: module loaded
+[   22.931265] loop0: detected capacity change from 0 to 2178816
+[   23.626173] squashfs: version 4.0 (2009/01/31) Phillip Lougher
+[   24.131255] overlayfs: "xino" feature enabled using 2 upper inode bits.
+[   48.529809] systemd[1]: System time advanced to timestamp on /usr/lib/clock-epoch: Sun 2026-03-01 12:46:49 UTC
+[   49.333094] random: crng init done
+[   49.360884] NET: Registered PF_VSOCK protocol family
+[   49.848963] systemd[1]: systemd 259.2-1-arch running in system mode (+PAM +AUDIT -SELINUX +APPARMOR -IMA +IPE +SMACK +SECCOMP +GCRYPT +GNUTLS +OPENSSL +ACL +BLKID +CURL +ELFUTILS +FIDO2 +IDN2 -IDN +KMOD +LIBCRYPTSETUP +LIBCRYPTSETUP_PLUGINS +LIBFDISK +PCRE2 +PWQUALITY +P11KIT +QRENCODE +TPM2 +BZIP2 +LZ4 +XZ +ZLIB +ZSTD +BPF_FRAMEWORK +BTF +XKBCOMMON +UTMP -SYSVINIT +LIBARCHIVE)
+[   49.849186] systemd[1]: Detected virtualization qemu.
+[   49.849405] systemd[1]: Detected architecture loongarch64.
+[   49.929130] systemd[1]: Detected first boot.
+[   50.027025] systemd[1]: Initializing machine ID from random generator.
+[   50.044157] systemd[1]: Hostname set to <archiso>.
+[   51.401823] systemd[1]: bpf-restrict-fs: LSM BPF program attached
+[   56.496807] systemd[1]: Applying preset policy.
+[   60.627347] systemd[1]: Created symlink '/etc/systemd/system/multi-user.target.wants/machines.target' → '/usr/lib/systemd/system/machines.target'.
+[   60.627682] systemd[1]: Created symlink '/etc/systemd/system/ctrl-alt-del.target' → '/usr/lib/systemd/system/reboot.target'.
+[   60.627761] systemd[1]: Created symlink '/etc/systemd/system/multi-user.target.wants/remote-cryptsetup.target' → '/usr/lib/systemd/system/remote-cryptsetup.target'.
+[   60.627839] systemd[1]: Created symlink '/etc/systemd/system/multi-user.target.wants/remote-integritysetup.target' → '/usr/lib/systemd/system/remote-integritysetup.target'.
+[   60.627911] systemd[1]: Created symlink '/etc/systemd/system/multi-user.target.wants/remote-veritysetup.target' → '/usr/lib/systemd/system/remote-veritysetup.target'.
+[   60.627998] systemd[1]: Created symlink '/etc/systemd/system/sysinit.target.wants/systemd-boot-clear-sysfail.service' → '/usr/lib/systemd/system/systemd-boot-clear-sysfail.service'.
+[   60.628043] systemd[1]: Created symlink '/etc/systemd/system/sysinit.target.wants/systemd-boot-update.service' → '/usr/lib/systemd/system/systemd-boot-update.service'.
+[   60.628086] systemd[1]: Created symlink '/etc/systemd/system/sysinit.target.wants/systemd-confext.service' → '/usr/lib/systemd/system/systemd-confext.service'.
+[   60.628163] systemd[1]: Created symlink '/etc/systemd/system/systemd-homed.service.wants/systemd-homed-activate.service' → '/usr/lib/systemd/system/systemd-homed-activate.service'.
+[   60.628203] systemd[1]: Created symlink '/etc/systemd/system/dbus-org.freedesktop.home1.service' → '/usr/lib/systemd/system/systemd-homed.service'.
+[   60.628231] systemd[1]: Created symlink '/etc/systemd/system/multi-user.target.wants/systemd-homed.service' → '/usr/lib/systemd/system/systemd-homed.service'.
+[   60.628258] systemd[1]: Created symlink '/etc/systemd/system/sockets.target.wants/systemd-journald-audit.socket' → '/usr/lib/systemd/system/systemd-journald-audit.socket'.
+[   60.628287] systemd[1]: Created symlink '/etc/systemd/system/systemd-journald.service.wants/systemd-journald-audit.socket' → '/usr/lib/systemd/system/systemd-journald-audit.socket'.
+[   60.628314] systemd[1]: Created symlink '/etc/systemd/system/sockets.target.wants/systemd-mountfsd.socket' → '/usr/lib/systemd/system/systemd-mountfsd.socket'.
+[   60.628341] systemd[1]: Created symlink '/etc/systemd/system/sysinit.target.wants/systemd-network-generator.service' → '/usr/lib/systemd/system/systemd-network-generator.service'.
+[   60.628368] systemd[1]: Created symlink '/etc/systemd/system/sockets.target.wants/systemd-networkd-varlink.socket' → '/usr/lib/systemd/system/systemd-networkd-varlink.socket'.
+[   60.628411] systemd[1]: Created symlink '/etc/systemd/system/sockets.target.wants/systemd-networkd-resolve-hook.socket' → '/usr/lib/systemd/system/systemd-networkd-resolve-hook.socket'.
+[   60.628454] systemd[1]: Created symlink '/etc/systemd/system/sockets.target.wants/systemd-nsresourced.socket' → '/usr/lib/systemd/system/systemd-nsresourced.socket'.
+[   60.628481] systemd[1]: Created symlink '/etc/systemd/system/sysinit.target.wants/systemd-pstore.service' → '/usr/lib/systemd/system/systemd-pstore.service'.
+[   60.628507] systemd[1]: Created symlink '/etc/systemd/system/sysinit.target.wants/systemd-resolved.service' → '/usr/lib/systemd/system/systemd-resolved.service'.
+[   60.628534] systemd[1]: Created symlink '/etc/systemd/system/sockets.target.wants/systemd-resolved-varlink.socket' → '/usr/lib/systemd/system/systemd-resolved-varlink.socket'.
+[   60.628561] systemd[1]: Created symlink '/etc/systemd/system/sockets.target.wants/systemd-resolved-monitor.socket' → '/usr/lib/systemd/system/systemd-resolved-monitor.socket'.
+[   60.628588] systemd[1]: Created symlink '/etc/systemd/system/sysinit.target.wants/systemd-sysext.service' → '/usr/lib/systemd/system/systemd-sysext.service'.
+[   60.628614] systemd[1]: Created symlink '/etc/systemd/system/factory-reset.target.wants/systemd-tpm2-clear.service' → '/usr/lib/systemd/system/systemd-tpm2-clear.service'.
+[   60.628752] systemd[1]: Populated /etc with preset unit settings.
+[   62.740995] systemd[1]: Queued start job for default target Graphical Interface.
+[   62.966764] systemd[1]: Created slice Slice /system/dirmngr.
+[   62.982252] systemd[1]: Created slice Slice /system/getty.
+[   62.992013] systemd[1]: Created slice Slice /system/gpg-agent.
+[   63.002571] systemd[1]: Created slice Slice /system/gpg-agent-browser.
+[   63.009948] systemd[1]: Created slice Slice /system/gpg-agent-extra.
+[   63.021555] systemd[1]: Created slice Slice /system/gpg-agent-ssh.
+[   63.030806] systemd[1]: Created slice Slice /system/keyboxd.
+[   63.044591] systemd[1]: Created slice Slice /system/modprobe.
+[   63.056363] systemd[1]: Created slice User and Session Slice.
+[   63.062181] systemd[1]: Started Dispatch Password Requests to Console Directory Watch.
+[   63.070473] systemd[1]: Started Forward Password Requests to Wall Directory Watch.
+[   63.083139] systemd[1]: Set up automount Arbitrary Executable File Formats File System Automount Point.
+[   63.088305] systemd[1]: Reached target Local Encrypted Volumes.
+[   63.092426] systemd[1]: Reached target Image Downloads.
+[   63.096914] systemd[1]: Reached target Local Integrity Protected Volumes.
+[   63.102979] systemd[1]: Reached target Path Units.
+[   63.106497] systemd[1]: Reached target Remote Encrypted Volumes.
+[   63.110710] systemd[1]: Reached target Remote File Systems.
+[   63.117938] systemd[1]: Reached target Remote Integrity Protected Volumes.
+[   63.121897] systemd[1]: Reached target Remote Verity Protected Volumes.
+[   63.125632] systemd[1]: Reached target Slice Units.
+[   63.130902] systemd[1]: Reached target Swaps.
+[   63.137003] systemd[1]: Reached target Local Verity Protected Volumes.
+[   63.144570] systemd[1]: Listening on Device-mapper event daemon FIFOs.
+[   63.153861] systemd[1]: Listening on LVM2 poll daemon socket.
+[   63.237835] systemd[1]: Listening on Query the User Interactively for a Password.
+[   63.269356] systemd[1]: Listening on Process Core Dump Socket.
+[   63.287952] systemd[1]: Listening on Credential Encryption/Decryption.
+[   63.314623] systemd[1]: Listening on Factory Reset Management.
+[   63.461938] systemd[1]: Listening on Journal Audit Socket.
+[   63.471056] systemd[1]: Listening on Journal Socket (/dev/log).
+[   63.475457] systemd[1]: Listening on Journal Sockets.
+[   63.483576] systemd[1]: Listening on DDI File System Mounter Socket.
+[   63.509763] systemd[1]: Listening on Console Output Muting Service Socket.
+[   63.521109] systemd[1]: Listening on Network Management Resolve Hook Socket.
+[   63.528659] systemd[1]: Listening on Network Management Varlink Socket.
+[   63.535607] systemd[1]: Listening on Network Management Netlink Socket.
+[   63.541226] systemd[1]: Listening on Namespace Resource Manager Socket.
+[   63.549689] systemd[1]: TPM PCR Measurements skipped, unmet condition check ConditionSecurity=measured-uki
+[   63.550891] systemd[1]: Make TPM PCR Policy skipped, unmet condition check ConditionSecurity=measured-uki
+[   63.566949] systemd[1]: Listening on Disk Repartitioning Service Socket.
+[   63.570973] systemd[1]: Listening on Resolve Monitor Varlink Socket.
+[   63.578073] systemd[1]: Listening on Resolve Service Varlink Socket.
+[   63.585912] systemd[1]: Listening on udev Control Socket.
+[   63.591579] systemd[1]: Listening on udev Kernel Socket.
+[   63.598942] systemd[1]: Listening on udev Varlink Socket.
+[   63.606831] systemd[1]: Listening on User Database Manager Socket.
+[   63.698104] systemd[1]: Mounting Huge Pages File System...
+[   63.747054] systemd[1]: Mounting POSIX Message Queue File System...
+[   63.806467] systemd[1]: Mounting Kernel Debug File System...
+[   63.897440] systemd[1]: Mounting Kernel Trace File System...
+[   63.999463] systemd[1]: Mounting Temporary Directory /tmp...
+[   64.172315] systemd[1]: Starting Create List of Static Device Nodes...
+[   64.358707] systemd[1]: Starting Monitoring of LVM2 mirrors, snapshots etc. using dmeventd or progress polling...
+[   64.410711] systemd[1]: Load Kernel Module configfs skipped, unmet condition check ConditionKernelModuleLoaded=!configfs
+[   64.606168] systemd[1]: Mounting Kernel Configuration File System...
+[   64.639300] systemd[1]: Load Kernel Module drm skipped, unmet condition check ConditionKernelModuleLoaded=!drm
+[   64.640097] systemd[1]: Load Kernel Module efi_pstore skipped, unmet condition check ConditionKernelModuleLoaded=!efi_pstore
+[   64.640536] systemd[1]: Load Kernel Module fuse skipped, unmet condition check ConditionKernelModuleLoaded=!fuse
+[   64.866299] systemd[1]: Mounting FUSE Control File System...
+[   64.916921] systemd[1]: Clear SysFail Entry If The Boot Is Successful skipped, unmet condition check ConditionPathExists=/sys/firmware/efi/efivars/LoaderEntrySysFail-4a67b082-0a4c-41cf-b6c7-440b29bb8c4f
+[   64.942005] systemd[1]: Clear Stale Hibernate Storage Info skipped, unmet condition check ConditionPathExists=/sys/firmware/efi/efivars/HibernateLocation-8cf2644b-4b0b-428f-9387-6d876050dc67
+[   65.494786] systemd[1]: Starting Journal Service...
+[   66.824072] systemd[1]: Starting Load Kernel Modules...
+[   66.994239] systemd[1]: Starting Generate Network Units from Kernel Command Line...
+[   67.008680] systemd[1]: TPM PCR Machine ID Measurement skipped, unmet condition check ConditionSecurity=measured-uki
+[   67.018789] systemd[1]: TPM NvPCR Product ID Measurement skipped, unmet condition check ConditionSecurity=measured-uki
+[   67.151641] systemd[1]: Starting Remount Root and Kernel File Systems...
+[   67.435959] systemd[1]: Starting Wait Until Kernel Time Synchronized...
+[   67.451557] systemd[1]: Early TPM SRK Setup skipped, unmet condition check ConditionSecurity=measured-uki
+[   67.546649] systemd[1]: Starting Load udev Rules from Credentials...
+[   67.779640] systemd[1]: Starting Coldplug All udev Devices...
+[   69.269450] Asymmetric key parser 'pkcs8' registered
+[   69.939562] systemd-journald[407]: Collecting audit messages is enabled.
+[   70.575139] device-mapper: uevent: version 1.0.3
+[   70.581813] device-mapper: ioctl: 4.50.0-ioctl (2025-04-28) initialised: dm-devel@lists.linux.dev
+[   71.180158] systemd[1]: Finished Create List of Static Device Nodes.
+[   71.333962] audit: type=1130 audit(1772369231.868:2): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=kmod-static-nodes comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[   71.764798] systemd[1]: Finished Monitoring of LVM2 mirrors, snapshots etc. using dmeventd or progress polling.
+[   71.873121] audit: type=1130 audit(1772369232.411:3): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=lvm2-monitor comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[   72.177246] systemd[1]: Started Journal Service.
+[   72.263730] audit: type=1130 audit(1772369232.804:4): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-journald comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[   73.416957] audit: type=1130 audit(1772369233.956:5): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-modules-load comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[   73.455011] audit: type=1130 audit(1772369233.993:6): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-remount-fs comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[   73.518608] audit: type=1130 audit(1772369234.058:7): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-udev-load-credentials comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[   75.338481] audit: type=1130 audit(1772369235.877:8): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-network-generator comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[   76.868860] systemd-journald[407]: Received client request to flush runtime journal.
+[   77.002637] audit: type=1130 audit(1772369237.538:9): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-journal-flush comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[   77.205703] audit: type=1130 audit(1772369237.744:10): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-random-seed comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[   77.686367] audit: type=1130 audit(1772369238.225:11): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-sysctl comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[   78.491212] audit: type=1334 audit(1772369239.031:12): prog-id=22 op=LOAD
+[   78.501038] audit: type=1334 audit(1772369239.038:13): prog-id=23 op=LOAD
+[   78.505651] audit: type=1334 audit(1772369239.045:14): prog-id=24 op=LOAD
+[   79.749898] audit: type=1130 audit(1772369240.286:15): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-udev-trigger comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[   79.950622] tun: Universal TUN/TAP device driver, 1.6
+[   80.017800] audit: type=1130 audit(1772369240.556:16): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=modprobe@tun comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[   80.023266] audit: type=1131 audit(1772369240.562:17): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=modprobe@tun comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[   80.084626] audit: type=1334 audit(1772369240.623:18): prog-id=25 op=LOAD
+[   83.683462] kauditd_printk_skb: 64 callbacks suppressed
+[   83.683537] audit: type=1130 audit(1772369244.221:43): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-tmpfiles-setup-dev-early comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[   84.338696] audit: type=1130 audit(1772369244.877:44): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-sysusers comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[   84.370661] audit: type=1334 audit(1772369244.911:45): prog-id=38 op=LOAD
+[   84.422803] audit: type=1334 audit(1772369244.963:46): prog-id=39 op=LOAD
+[   88.202152] audit: type=1130 audit(1772369248.741:47): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-tmpfiles-setup-dev comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[   88.565453] audit: type=1334 audit(1772369249.105:48): prog-id=40 op=LOAD
+[   88.576774] audit: type=1334 audit(1772369249.115:49): prog-id=41 op=LOAD
+[   89.428535] audit: type=1130 audit(1772369249.967:50): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-timesyncd comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[   94.226683] audit: type=1130 audit(1772369254.757:51): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-boot-update comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[   94.385542] audit: type=1130 audit(1772369254.921:52): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-userdb-load-credentials comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[   94.984690] audit: type=1130 audit(1772369255.521:53): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-resolved comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  100.825337] audit: type=1130 audit(1772369261.364:54): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-udevd comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  101.016522] audit: type=1334 audit(1772369261.556:55): prog-id=42 op=LOAD
+[  101.702379] audit: type=1130 audit(1772369262.240:56): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-tmpfiles-setup comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  104.613131] audit: type=1127 audit(1772369265.152:57): pid=483 uid=0 auid=4294967295 ses=4294967295 msg=' comm="systemd-update-utmp" exe="/usr/lib/systemd/systemd-update-utmp" hostname=? addr=? terminal=? res=success'
+[  105.285644] audit: type=1130 audit(1772369265.824:58): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-firstboot comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  105.387431] audit: type=1130 audit(1772369265.927:59): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-update-utmp comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  107.286189] audit: type=1130 audit(1772369267.821:60): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-machine-id-commit comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  108.335720] audit: type=1130 audit(1772369268.874:61): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-journal-catalog-update comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  108.350143] cfg80211: Loading compiled-in X.509 certificates for regulatory database
+[  108.883586] Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
+[  108.884465] Loaded X.509 cert 'wens: 61c038651aabdcf94bd0ac7ff06c7248db18c600'
+[  110.497906] audit: type=1334 audit(1772369271.025:62): prog-id=43 op=LOAD
+[  110.497996] audit: type=1300 audit(1772369271.025:62): arch=c0000102 syscall=280 success=yes exit=24 a0=5 a1=7ffffbc1c050 a2=94 a3=7ffffbc1c0e0 items=0 ppid=1 pid=478 auid=4294967295 uid=977 gid=977 euid=977 suid=977 fsuid=977 egid=977 sgid=977 fsgid=977 tty=(none) ses=4294967295 comm="systemd-network" exe="/usr/lib/systemd/systemd-networkd" key=(null)
+[  110.498026] audit: type=1327 audit(1772369271.025:62): proctitle="/usr/lib/systemd/systemd-networkd"
+[  110.506425] audit: type=1334 audit(1772369271.037:63): prog-id=43 op=UNLOAD
+[  110.506498] audit: type=1300 audit(1772369271.037:63): arch=c0000102 syscall=57 success=yes exit=0 a0=18 a1=0 a2=0 a3=0 items=0 ppid=1 pid=478 auid=4294967295 uid=977 gid=977 euid=977 suid=977 fsuid=977 egid=977 sgid=977 fsgid=977 tty=(none) ses=4294967295 comm="systemd-network" exe="/usr/lib/systemd/systemd-networkd" key=(null)
+[  110.506527] audit: type=1327 audit(1772369271.037:63): proctitle="/usr/lib/systemd/systemd-networkd"
+[  110.515026] audit: type=1334 audit(1772369271.045:64): prog-id=44 op=LOAD
+[  110.515219] audit: type=1300 audit(1772369271.045:64): arch=c0000102 syscall=280 success=yes exit=24 a0=5 a1=7ffffbc1c040 a2=98 a3=7ffffbc1c0d8 items=0 ppid=1 pid=478 auid=4294967295 uid=977 gid=977 euid=977 suid=977 fsuid=977 egid=977 sgid=977 fsgid=977 tty=(none) ses=4294967295 comm="systemd-network" exe="/usr/lib/systemd/systemd-networkd" key=(null)
+[  113.567900] kauditd_printk_skb: 32 callbacks suppressed
+[  113.567983] audit: type=1130 audit(1772369274.107:76): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-networkd-persistent-storage comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  119.884401] virtio_net virtio0 enp0s1: renamed from eth0
+[  129.949412] mousedev: PS/2 mouse device common for all mice
+[  134.726160] rtc-efi rtc-efi.0: registered as rtc0
+[  134.750994] rtc-efi rtc-efi.0: setting system clock to 2026-04-25T02:40:29 UTC (1777084829)
+[  143.031607] audit: type=1130 audit(1777084837.803:77): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-vconsole-setup comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  145.692770] audit: type=1130 audit(1777084840.465:78): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=ldconfig comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  145.991421] audit: type=1130 audit(1777084840.763:79): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-update-done comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  146.477518] audit: type=1334 audit(1777084841.249:80): prog-id=50 op=LOAD
+[  148.276638] audit: type=1130 audit(1777084843.048:81): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=dbus-broker comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  148.344073] audit: type=1334 audit(1777084843.116:82): prog-id=51 op=LOAD
+[  148.410144] audit: type=1334 audit(1777084843.181:83): prog-id=52 op=LOAD
+[  148.674310] audit: type=1334 audit(1777084843.444:84): prog-id=53 op=LOAD
+[  149.018023] audit: type=1334 audit(1777084843.789:85): prog-id=54 op=LOAD
+[  149.046627] audit: type=1334 audit(1777084843.817:86): prog-id=55 op=LOAD
+[  149.072421] audit: type=1334 audit(1777084843.843:87): prog-id=56 op=LOAD
+[  150.470244] NET: Registered PF_ALG protocol family
+[  151.498744] audit: type=1130 audit(1777084846.704:88): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-time-wait-sync comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  153.866443] audit: type=1130 audit(1777084849.071:89): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-homed comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  153.987393] audit: type=1130 audit(1777084849.191:90): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-homed-activate comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  156.637699] audit: type=1130 audit(1777084851.841:91): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-logind comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  159.305944] audit: type=1130 audit(1777084854.509:92): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=polkit comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  164.907908] audit: type=1130 audit(1777084860.111:93): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=sshdgenkeys comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  164.912691] audit: type=1131 audit(1777084860.117:94): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=sshdgenkeys comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  166.370855] NET: Registered PF_QIPCRTR protocol family
+[  166.492083] audit: type=1130 audit(1777084861.694:95): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=ModemManager comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  170.117512] audit: type=1130 audit(1777084865.321:96): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=gpg-agent@etc-pacman.d-gnupg comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  172.417984] audit: type=1130 audit(1777084867.619:97): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=iwd comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  173.827647] audit: type=1130 audit(1777084869.032:98): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=systemd-user-sessions comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  173.967478] audit: type=1130 audit(1777084869.171:99): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=getty@tty1 comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  174.534017] audit: type=1130 audit(1777084869.739:100): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=sshd comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  182.725180] audit: type=1101 audit(1777084877.925:101): pid=691 uid=0 auid=4294967295 ses=4294967295 msg='op=PAM:accounting grantors=pam_access,pam_unix,pam_permit,pam_time acct="root" exe="/usr/bin/login" hostname=archiso addr=? terminal=/dev/tty1 res=success'
+[  182.940190] audit: type=1103 audit(1777084878.144:102): pid=691 uid=0 auid=4294967295 ses=4294967295 msg='op=PAM:setcred grantors=pam_shells,pam_faillock,pam_permit,pam_env,pam_faillock acct="root" exe="/usr/bin/login" hostname=archiso addr=? terminal=/dev/tty1 res=success'
+[  182.947918] audit: type=1006 audit(1777084878.152:103): pid=691 uid=0 old-auid=4294967295 auid=0 tty=tty1 old-ses=4294967295 ses=1 res=1
+[  182.951974] audit: type=1300 audit(1777084878.152:103): arch=c0000102 syscall=64 success=yes exit=1 a0=3 a1=7ffffbf91670 a2=1 a3=0 items=0 ppid=1 pid=691 auid=0 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=tty1 ses=1 comm="login" exe="/usr/bin/login" key=(null)
+[  182.952058] audit: type=1327 audit(1777084878.152:103): proctitle=2F62696E2F6C6F67696E002D70002D66002D2D
+[  185.504368] audit: type=1130 audit(1777084880.708:104): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=user-runtime-dir@0 comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  186.321347] audit: type=1101 audit(1777084881.526:105): pid=714 uid=0 auid=4294967295 ses=4294967295 msg='op=PAM:accounting grantors=pam_access,pam_unix,pam_permit,pam_time acct="root" exe="/usr/lib/systemd/systemd-executor" hostname=? addr=? terminal=? res=success'
+[  186.330025] audit: type=1103 audit(1777084881.534:106): pid=714 uid=0 auid=4294967295 ses=4294967295 msg='op=PAM:setcred grantors=? acct="root" exe="/usr/lib/systemd/systemd-executor" hostname=? addr=? terminal=? res=failed'
+[  186.342039] audit: type=1006 audit(1777084881.543:107): pid=714 uid=0 old-auid=4294967295 auid=0 tty=(none) old-ses=4294967295 ses=2 res=1
+[  186.342118] audit: type=1300 audit(1777084881.543:107): arch=c0000102 syscall=64 success=yes exit=1 a0=8 a1=7ffffbb76bf0 a2=1 a3=0 items=0 ppid=1 pid=714 auid=0 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=(none) ses=2 comm="(systemd)" exe="/usr/lib/systemd/systemd-executor" key=(null)
+[  188.042047] kauditd_printk_skb: 32 callbacks suppressed
+[  188.042081] audit: type=1334 audit(1777084882.419:119): prog-id=62 op=LOAD
+[  188.043407] audit: type=1300 audit(1777084882.419:119): arch=c0000102 syscall=280 success=yes exit=11 a0=5 a1=7ffffbc73d00 a2=98 a3=7ffffbc73d98 items=0 ppid=1 pid=714 auid=0 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=(none) ses=2 comm="systemd" exe="/usr/lib/systemd/systemd" key=(null)
+[  188.043546] audit: type=1327 audit(1777084882.419:119): proctitle="(systemd)"
+[  189.137900] audit: type=1334 audit(1777084883.247:120): prog-id=63 op=LOAD
+[  189.139574] audit: type=1300 audit(1777084883.247:120): arch=c0000102 syscall=280 success=yes exit=12 a0=5 a1=7ffffbc73d00 a2=98 a3=7ffffbc73d98 items=0 ppid=1 pid=714 auid=0 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=(none) ses=2 comm="systemd" exe="/usr/lib/systemd/systemd" key=(null)
+[  189.140521] audit: type=1327 audit(1777084883.247:120): proctitle="(systemd)"
+[  189.143671] audit: type=1334 audit(1777084884.347:121): prog-id=62 op=UNLOAD
+[  189.143945] audit: type=1300 audit(1777084884.347:121): arch=c0000102 syscall=57 success=yes exit=0 a0=b a1=0 a2=0 a3=0 items=0 ppid=1 pid=714 auid=0 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=(none) ses=2 comm="systemd" exe="/usr/lib/systemd/systemd" key=(null)
+[  189.146820] audit: type=1327 audit(1777084884.347:121): proctitle="(systemd)"
+[  189.146944] audit: type=1334 audit(1777084884.349:122): prog-id=63 op=UNLOAD
+[  196.243684] kauditd_printk_skb: 38 callbacks suppressed
+[  196.244968] audit: type=1130 audit(1777084891.436:135): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=user@0 comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  196.604246] audit: type=1105 audit(1777084891.804:136): pid=691 uid=0 auid=0 ses=1 msg='op=PAM:session_open grantors=pam_loginuid,pam_keyinit,pam_systemd_home,pam_limits,pam_unix,pam_permit,pam_lastlog2,pam_mail,pam_umask,pam_systemd,pam_env acct="root" exe="/usr/bin/login" hostname=archiso addr=? terminal=/dev/tty1 res=success'
+[  196.612703] audit: type=1110 audit(1777084891.812:137): pid=691 uid=0 auid=0 ses=1 msg='op=PAM:setcred grantors=pam_shells,pam_faillock,pam_permit,pam_env,pam_faillock acct="root" exe="/usr/bin/login" hostname=archiso addr=? terminal=/dev/tty1 res=success'
+[  253.206321] audit: type=1131 audit(1777084948.401:138): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=gpg-agent@etc-pacman.d-gnupg comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+[  306.800375] audit: type=1130 audit(1777085001.978:139): pid=1 uid=0 auid=4294967295 ses=4294967295 msg='unit=pacman-init comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
